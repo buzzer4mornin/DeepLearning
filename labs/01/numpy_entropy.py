@@ -11,21 +11,32 @@ parser.add_argument("--recodex", default=False, action="store_true", help="Evalu
 def main(args):
     # TODO: Load data distribution, each line containing a datapoint -- a string.
     with open("numpy_entropy_data.txt", "r") as data:
+        ddict = {}
         for line in data:
             line = line.rstrip("\n")
             # TODO: Process the line, aggregating data with built-in Python
             # data structures (not NumPy, which is not suitable for incremental
             # addition and string mapping).
+            try:
+                ddict[line] += 1
+            except KeyError:
+                ddict[line] = 1
 
     # TODO: Create a NumPy array containing the data distribution. The
     # NumPy array should contain only data, not any mapping. Alternatively,
     # the NumPy array might be created after loading the model distribution.
+    arr = np.array(list(ddict.values()))
+    data_dist = arr/sum(arr)
 
     # TODO: Load model distribution, each line `string \t probability`.
     with open("numpy_entropy_model.txt", "r") as model:
+        model_dist = []
         for line in model:
             line = line.rstrip("\n")
             # TODO: process the line, aggregating using Python data structures
+            model_dist.append(line[-3:])
+
+    model_dist = np.array(model_dist)
 
     # TODO: Create a NumPy array containing the model distribution.
 
@@ -49,6 +60,6 @@ def main(args):
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
     entropy, crossentropy, kl_divergence = main(args)
-    print("Entropy: {:.2f} nats".format(entropy))
-    print("Crossentropy: {:.2f} nats".format(crossentropy))
-    print("KL divergence: {:.2f} nats".format(kl_divergence))
+    #print("Entropy: {:.2f} nats".format(entropy))
+    #print("Crossentropy: {:.2f} nats".format(crossentropy))
+    #print("KL divergence: {:.2f} nats".format(kl_divergence))
