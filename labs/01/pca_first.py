@@ -37,35 +37,35 @@ def main(args):
     # We want to reshape it to [args.examples, MNIST.H * MNIST.W * MNIST.C].
     # We can do so using `tf.reshape(data, new_shape)` with new shape
     # `[data.shape[0], data.shape[1] * data.shape[2] * data.shape[3]]`.
-    data = None
+    data = tf.reshape(data, [data.shape[0], data.shape[1] * data.shape[2] * data.shape[3]])
 
     # TODO: Now compute mean of every feature. Use `tf.math.reduce_mean`,
     # and set `axis` to zero -- therefore, the mean will be computed
     # across the first dimension, so across examples.
-    mean = None
+    mean = tf.math.reduce_mean(data, axis=0)
 
     # TODO: Compute the covariance matrix. The covariance matrix is
     #   (data - mean)^T * (data - mean) / data.shape[0]
     # where transpose can be computed using `tf.transpose` and matrix
     # multiplication using either Python operator @ or `tf.linalg.matmul`.
-    cov = None
+    cov = tf.linalg.matmul(data-mean, data-mean, transpose_a=True)
 
     # TODO: Compute the total variance, which is sum of the diagonal
     # of the covariance matrix. To extract the diagonal use `tf.linalg.diag_part`
     # and to sum a tensor use `tf.math.reduce_sum`.
-    total_variance = None
+    total_variance = tf.math.reduce_sum(tf.linalg.diag_part(cov))
 
     # TODO: Now run `args.iterations` of the power iteration algorithm.
     # Start with a vector of `cov.shape[0]` ones of type tf.float32 using `tf.ones`.
-    v = None
+    v = tf.ones(cov.shape[0], dtype=tf.float32)
+
     for i in range(args.iterations):
         # TODO: In the power iteration algorithm, we compute
-        # 1. v = cov * v
+        v = tf.linalg.matvec(cov, v)
         #    The matrix-vector multiplication can be computed using `tf.linalg.matvec`.
-        # 2. s = l2_norm(v)
+        s = tf.linalg.norm(v)
         #    The l2_norm can be computed using `tf.linalg.norm`.
-        # 3. v = v / s
-        pass
+        v = v / s
 
     # The `v` is now the eigenvector of the largest eigenvalue, `s`. We now
     # compute the explained variance, which is a ration of `s` and `total_variance`.
