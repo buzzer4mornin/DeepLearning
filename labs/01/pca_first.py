@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 import argparse
 import os
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by default
+
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # Report only TF errors by default
 
 import numpy as np
 import tensorflow as tf
@@ -15,6 +16,8 @@ parser.add_argument("--iterations", default=100, type=int, help="Iterations of t
 parser.add_argument("--recodex", default=False, action="store_true", help="Evaluation in ReCodEx.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+
+
 # If you add more arguments, ReCodEx will keep them with your default values.
 
 def main(args):
@@ -70,6 +73,7 @@ def main(args):
 
     # Return the total and explained variance for ReCodEx to validate
     return total_variance.numpy(), 100 * explained_variance.numpy()
+
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
