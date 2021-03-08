@@ -3,7 +3,8 @@ import argparse
 import datetime
 import os
 import re
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by default
+
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # Report only TF errors by default
 
 import numpy as np
 import tensorflow as tf
@@ -17,6 +18,7 @@ parser.add_argument("--epochs", default=10, type=int, help="Number of epochs.")
 parser.add_argument("--hidden_layer", default=100, type=int, help="Size of the hidden layer.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+
 
 def main(args):
     # Fix random seeds and threads
@@ -53,7 +55,7 @@ def main(args):
     )
 
     tb_callback = tf.keras.callbacks.TensorBoard(args.logdir, histogram_freq=1, update_freq=100, profile_batch=0)
-    tb_callback._close_writers = lambda: None # Ugly hack allowing to log also test data metrics.
+    tb_callback._close_writers = lambda: None  # Ugly hack allowing to log also test data metrics.
     model.fit(
         mnist.train.data["images"], mnist.train.data["labels"],
         batch_size=args.batch_size, epochs=args.epochs,
@@ -65,6 +67,7 @@ def main(args):
         mnist.test.data["images"], mnist.test.data["labels"], batch_size=args.batch_size, return_dict=True,
     )
     tb_callback.on_epoch_end(0, {"val_test_" + metric: value for metric, value in test_logs.items()})
+
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)

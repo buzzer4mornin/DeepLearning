@@ -78,5 +78,5 @@ def main(args):
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
     total_variance, explained_variance = main(args)
-    print("Total variance: {:.2f}".format(total_variance))
+    print("Total variance: {:.2f}".format(total_variance/args.examples))
     print("Explained variance: {:.2f}".format(explained_variance))

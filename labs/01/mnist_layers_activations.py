@@ -3,7 +3,8 @@ import argparse
 import datetime
 import os
 import re
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by default
+
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # Report only TF errors by default
 
 import numpy as np
 import tensorflow as tf
@@ -20,6 +21,8 @@ parser.add_argument("--hidden_layers", default=1, type=int, help="Number of laye
 parser.add_argument("--recodex", default=False, action="store_true", help="Evaluation in ReCodEx.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+
+
 # If you add more arguments, ReCodEx will keep them with your default values.
 
 def main(args):
@@ -46,13 +49,19 @@ def main(args):
     # Create the model
     model = tf.keras.Sequential()
     model.add(tf.keras.layers.InputLayer([MNIST.H, MNIST.W, MNIST.C]))
-    # TODO: Finish the model. Namely add:
-    # - a `tf.keras.layers.Flatten()` layer
-    # - add `args.hidden_layers` number of fully connected hidden layers
-    #   `tf.keras.layers.Dense()` with  `args.hidden_layer` neurons, using activation
-    #   from `args.activation`, allowing "none", "relu", "tanh", "sigmoid".
-    # - finally, add a final fully connected layer with
-    #   `MNIST.LABELS` units and `tf.nn.softmax` activation.
+    model.add(tf.keras.layers.Flatten(name="flatten"))
+    for i in range(0, args.hidden_layers):
+        if args.activation == "none":
+            model.add(tf.keras.layers.Dense(args.hidden_layer))
+        if args.activation == "tanh":
+            model.add(tf.keras.layers.Dense(args.hidden_layer, activation=tf.nn.tanh))
+        if args.activation == "sigmoid":
+            model.add(tf.keras.layers.Dense(args.hidden_layer, activation=tf.nn.sigmoid))
+        if args.activation == "relu":
+            model.add(tf.keras.layers.Dense(args.hidden_layer, activation=tf.nn.relu))
+
+    model.add(tf.keras.layers.Dense(MNIST.LABELS, activation=tf.nn.softmax, name="output_layer"))
+    model.summary()
 
     model.compile(
         optimizer=tf.optimizers.Adam(),
@@ -61,7 +70,7 @@ def main(args):
     )
 
     tb_callback = tf.keras.callbacks.TensorBoard(args.logdir, histogram_freq=1, update_freq=100, profile_batch=0)
-    tb_callback._close_writers = lambda: None # Ugly hack allowing to log also test data metrics.
+    tb_callback._close_writers = lambda: None  # Ugly hack allowing to log also test data metrics.
     model.fit(
         mnist.train.data["images"], mnist.train.data["labels"],
         batch_size=args.batch_size, epochs=args.epochs,
@@ -76,6 +85,7 @@ def main(args):
 
     # Return test accuracy for ReCodEx to validate
     return test_logs["accuracy"]
+
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
