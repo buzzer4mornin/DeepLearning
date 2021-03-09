@@ -72,11 +72,11 @@ def main(args):
     explained_variance = s / total_variance
 
     # Return the total and explained variance for ReCodEx to validate
-    return total_variance.numpy(), 100 * explained_variance.numpy()
+    return (total_variance/args.examples).numpy(), 100 * explained_variance.numpy()
 
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
     total_variance, explained_variance = main(args)
-    print("Total variance: {:.2f}".format(total_variance/args.examples))
+    print("Total variance: {:.2f}".format(total_variance))
     print("Explained variance: {:.2f}".format(explained_variance))
