@@ -2,6 +2,7 @@
 import argparse
 
 import numpy as np
+import math
 
 parser = argparse.ArgumentParser()
 # These arguments will be set appropriately by ReCodEx, even if you change them.
@@ -13,30 +14,27 @@ parser.add_argument("--recodex", default=False, action="store_true", help="Evalu
 def main(args):
     # TODO: Load data distribution, each line containing a datapoint -- a string.
     with open("numpy_entropy_data.txt", "r") as data:
-        ddict = {}
+        l = []
         for line in data:
             line = line.rstrip("\n")
             # TODO: Process the line, aggregating data with built-in Python
             # data structures (not NumPy, which is not suitable for incremental
             # addition and string mapping).
-            try:
-                ddict[line] += 1
-            except KeyError:
-                ddict[line] = 1
+            l.append(line)
 
     # TODO: Create a NumPy array containing the data distribution. The
     # NumPy array should contain only data, not any mapping. Alternatively,
     # the NumPy array might be created after loading the model distribution.
-    arr = np.array(list(ddict.values()))
-    data_dist = arr / sum(arr)
-
+    elements, count = np.unique(np.array(l), return_counts=True)
+    data_dist = count / len(l)
+    model_dist = np.zeros(np.size(elements))
     # TODO: Load model distribution, each line `string \t probability`.
     with open("numpy_entropy_model.txt", "r") as model:
-        model_dist = []
         for line in model:
             line = line.rstrip("\n")
             # TODO: process the line, aggregating using Python data structures
-            model_dist.append(float(line[-3:]))
+            line=line.rsplit("\t")
+            model_dist[np.nonzero(elements == line[0])] = line[1]
 
     # TODO: Create a NumPy array containing the model distribution.
     model_dist = np.array(model_dist)
@@ -49,12 +47,17 @@ def main(args):
     # TODO: Compute cross-entropy H(data distribution, model distribution).
     # When some data distribution elements are missing in the model distribution,
     # return `np.inf`.
-    data_dist = np.concatenate((data_dist, np.zeros(1)))
-    crossentropy = round(-np.sum(data_dist * np.log(model_dist)), 2)
+    try:
+        crossentropy = round(-np.sum(data_dist * np.log(model_dist)), 2)
+    except ValueError:
+        crossentropy = math.inf
 
     # TODO: Compute KL-divergence D_KL(data distribution, model_distribution),
     # again using `np.inf` when needed.
-    kl_divergence = round((crossentropy - entropy), 2)
+    try:
+        kl_divergence = round((crossentropy - entropy), 2)
+    except ValueError:
+        kl_divergence = math.inf
 
     # Return the computed values for ReCodEx to validate
     return entropy, crossentropy, kl_divergence
