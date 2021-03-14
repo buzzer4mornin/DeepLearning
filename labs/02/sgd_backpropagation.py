@@ -3,7 +3,8 @@ import argparse
 import datetime
 import os
 import re
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by default
+
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # Report only TF errors by default
 
 import numpy as np
 import tensorflow as tf
@@ -19,22 +20,26 @@ parser.add_argument("--learning_rate", default=0.1, type=float, help="Learning r
 parser.add_argument("--recodex", default=False, action="store_true", help="Evaluation in ReCodEx.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+
+
 # If you add more arguments, ReCodEx will keep them with your default values.
 
 class Model(tf.Module):
     def __init__(self, args):
         self._args = args
 
-        self._W1 = tf.Variable(tf.random.normal([MNIST.W * MNIST.H * MNIST.C, args.hidden_layer], stddev=0.1, seed=args.seed), trainable=True)
+        self._W1 = tf.Variable(
+            tf.random.normal([MNIST.W * MNIST.H * MNIST.C, args.hidden_layer], stddev=0.1, seed=args.seed),
+            trainable=True)
         self._b1 = tf.Variable(tf.zeros([args.hidden_layer]), trainable=True)
 
         # TODO: Create variables:
         # - _W2, which is a trainable Variable of size [args.hidden_layer, MNIST.LABELS],
         #   initialized to `tf.random.normal` value with stddev=0.1 and seed=args.seed,
         # - _b2, which is a trainable Variable of size [MNIST.LABELS] initialized to zeros
-        self._W2 = tf.Variable(tf.random.normal([args.hidden_layer, MNIST.LABELS], stddev=0.1, seed=args.seed), trainable=True)
+        self._W2 = tf.Variable(tf.random.normal([args.hidden_layer, MNIST.LABELS], stddev=0.1, seed=args.seed),
+                               trainable=True)
         self._b2 = tf.Variable(tf.zeros([MNIST.LABELS]), trainable=True)
-
 
     def predict(self, inputs):
         # TODO: Define the computation of the network. Notably:
@@ -45,9 +50,9 @@ class Model(tf.Module):
         # - apply `tf.nn.tanh`
         # - multiply the result by `self._W2` and then add `self._b2`
         # - finally apply `tf.nn.softmax` and return the result
+        inputs = tf.reshape(inputs, [inputs.shape[0], -1])
         hidden = tf.nn.tanh(tf.matmul(inputs, self._W1) + self._b1)
         out = tf.nn.softmax(tf.matmul(hidden, self._W2) + self._b2)
-        inputs = tf.reshape(inputs, [inputs.shape[0], -1])
         return out
 
     def train_epoch(self, dataset):
@@ -117,12 +122,12 @@ def main(args):
     mnist = MNIST()
 
     # Create the TensorBoard writer
-    writer = tf.summary.create_file_writer(args.logdir, flush_millis=10*1000)
+    writer = tf.summary.create_file_writer(args.logdir, flush_millis=10 * 1000)
 
     # Create the model
     model = Model(args)
 
-    print(model.predict(mnist.train.data["images"]))   # ---
+    print(model.train_epoch(mnist.train))
     exit()
 
     for epoch in range(args.epochs):
@@ -142,6 +147,7 @@ def main(args):
 
     # Return test accuracy for ReCodEx to validate
     return accuracy.numpy()
+
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
