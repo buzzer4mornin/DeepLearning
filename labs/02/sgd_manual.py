@@ -53,7 +53,7 @@ class Model(tf.Module):
         # TODO: In order to support manual gradient computation, you should
         # return not only the output layer, but also the hidden layer after applying
         # tf.nn.tanh, and the input layer after reshaping.
-        return inputs, hidden, outputs
+        return inputs, hidden_in, hidden_out, outputs
 
     def train_epoch(self, dataset):
         for batch in dataset.batches(self._args.batch_size):
