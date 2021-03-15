@@ -67,17 +67,19 @@ class Model(tf.Module):
             # the gradient manually, without tf.GradientTape. ReCodEx checks
             # that `tf.GradientTape` is not used and if it is, your solution does
             # not pass.
-            inputs, hidden, outputs = self.predict(batch["images"])
 
             # TODO: Compute the input layer, hidden layer and output layer
             # of the batch images using `self.predict`.
+            inputs, hidden_in, hidden_out, outputs = self.predict(batch["images"])
 
             # TODO: Compute the gradient of the loss with respect to all
             # variables. Note that the loss is computed as:
             # - for every batch example, it is the categorical crossentropy of the
             #   predicted probabilities and gold batch label
             # - finally, the individual batch example losses are averaged
-            #
+            loss = tf.reduce_mean(
+                tf.keras.losses.categorical_crossentropy(tf.one_hot(batch["labels"], outputL.shape[1]),
+                                                         outputL))
             # During the gradient computation, you will need to compute
             # a so-called outer product
             #   `C[a, i, j] = A[a, i] * B[a, j]`
