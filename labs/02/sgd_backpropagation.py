@@ -75,8 +75,7 @@ class Model(tf.Module):
                 #   predicted probabilities and gold batch label
                 # - finally, compute the average across the batch examples
                 y_true = tf.one_hot(batch["labels"], probabilities.shape[1])
-                loss = tf.math.reduce_mean(tf.keras.losses.CategoricalCrossentropy()(probabilities, y_true))
-
+                loss = tf.math.reduce_mean(tf.keras.losses.categorical_crossentropy(probabilities, y_true))
 
             # We create a list of all variables. Note that a `tf.Module` automatically
             # tracks owned variables, so we could also used `self.trainable_variables`
@@ -85,25 +84,28 @@ class Model(tf.Module):
 
             # TODO: Compute the gradient of the loss with respect to variables using
             # backpropagation algorithm via `tape.gradient`
-            gradients = ...
+            gradients = tape.gradient(loss, variables)
 
             for variable, gradient in zip(variables, gradients):
                 # TODO: Perform the SGD update with learning rate `self._args.learning_rate`
                 # for the variable and computed gradient. You can modify
                 # variable value with `variable.assign` or in this case the more
                 # efficient `variable.assign_sub`.
-                ...
+                variable.assign_sub(gradient * self._args.learning_rate)
 
     def evaluate(self, dataset):
         # Compute the accuracy of the model prediction
         correct = 0
         for batch in dataset.batches(self._args.batch_size):
             # TODO: Compute the probabilities of the batch images
-            probabilities = ...
+            probabilities = self.predict(batch["images"])
 
             # TODO: Evaluate how many batch examples were predicted
             # correctly and increase `correct` variable accordingly.
-            correct += ...
+            # print(batch["labels"])
+            correct += tf.reduce_sum(tf.cast(tf.equal(tf.argmax(probabilities, axis=1), batch["labels"]), tf.float32))
+            # OR THIS -> np.sum((tf.math.argmax(probabilities, axis=1)).numpy() == batch["labels"])
+
 
         return correct / dataset.size
 
@@ -131,7 +133,7 @@ def main(args):
     # Create the model
     model = Model(args)
 
-    print(model.train_epoch(mnist.train))
+    print(model.evaluate(mnist.test))
     exit()
 
     for epoch in range(args.epochs):
