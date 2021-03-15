@@ -63,16 +63,20 @@ class Model(tf.Module):
             # Size of the batch is `self._args.batch_size`, except for the last, which
             # might be smaller.
 
+            # print(type(batch["images"]))
+
             # The tf.GradientTape is used to record all operations inside the with block.
             with tf.GradientTape() as tape:
                 # TODO: Compute the predicted probabilities of the batch images using `self.predict`
-                probabilities = ...
+                probabilities = self.predict(batch["images"])
 
                 # TODO: Compute the loss:
                 # - for every batch example, it is the categorical crossentropy of the
                 #   predicted probabilities and gold batch label
                 # - finally, compute the average across the batch examples
-                loss = ...
+                y_true = tf.one_hot(batch["labels"], probabilities.shape[1])
+                loss = tf.math.reduce_mean(tf.keras.losses.CategoricalCrossentropy()(probabilities, y_true))
+
 
             # We create a list of all variables. Note that a `tf.Module` automatically
             # tracks owned variables, so we could also used `self.trainable_variables`
