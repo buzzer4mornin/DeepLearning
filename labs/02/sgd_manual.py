@@ -3,7 +3,8 @@ import argparse
 import datetime
 import os
 import re
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by default
+
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # Report only TF errors by default
 
 import numpy as np
 import tensorflow as tf
@@ -19,13 +20,17 @@ parser.add_argument("--learning_rate", default=0.1, type=float, help="Learning r
 parser.add_argument("--recodex", default=False, action="store_true", help="Evaluation in ReCodEx.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+
+
 # If you add more arguments, ReCodEx will keep them with your default values.
 
 class Model(tf.Module):
     def __init__(self, args):
         self._args = args
 
-        self._W1 = tf.Variable(tf.random.normal([MNIST.W * MNIST.H * MNIST.C, args.hidden_layer], stddev=0.1, seed=args.seed), trainable=True)
+        self._W1 = tf.Variable(
+            tf.random.normal([MNIST.W * MNIST.H * MNIST.C, args.hidden_layer], stddev=0.1, seed=args.seed),
+            trainable=True)
         self._b1 = tf.Variable(tf.zeros([args.hidden_layer]), trainable=True)
 
         # TODO(sgd_backpropagation): Create variables:
@@ -77,9 +82,10 @@ class Model(tf.Module):
             # - for every batch example, it is the categorical crossentropy of the
             #   predicted probabilities and gold batch label
             # - finally, the individual batch example losses are averaged
-            loss = tf.reduce_mean(
-                tf.keras.losses.categorical_crossentropy(tf.one_hot(batch["labels"], outputL.shape[1]),
-                                                         outputL))
+
+            y_true = tf.one_hot(batch["labels"], outputs.shape[1])
+            loss = tf.math.reduce_mean(tf.keras.losses.categorical_crossentropy(outputs, y_true))
+
             # During the gradient computation, you will need to compute
             # a so-called outer product
             #   `C[a, i, j] = A[a, i] * B[a, j]`
@@ -88,22 +94,32 @@ class Model(tf.Module):
             # or with
             #   `tf.einsum("ai,aj->aij", A, B)`
 
+            g_output = -1 * tf.one_hot(batch["labels"], outputs.shape[1]) + outputs
+            g_b2 = tf.reduce_mean(g_output, axis=0)
+            g_W2 = tf.reduce_mean(tf.einsum("ai,aj->aji", g_output, hidden_out), axis=0)
+            g_hidden = tf.einsum("ijk,ik->ik", tf.einsum("ia,ja->iaj", g_output, self._W2), 1 - tf.math.pow(tf.nn.tanh(hidden_in), 2))
+            g_b1 = tf.reduce_mean(g_hidden, axis=0)
+            g_W1 = tf.reduce_mean(tf.einsum("ij,ik->ikj", g_hidden, inputs), axis=0)
+
             # TODO(sgd_backpropagation): Perform the SGD update with learning rate `self._args.learning_rate`
             # for the variable and computed gradient. You can modify
             # variable value with `variable.assign` or in this case the more
             # efficient `variable.assign_sub`.
-            ...
+            self._W1.assign_sub(self._args.learning_rate * g_W1)
+            self._b1.assign_sub(self._args.learning_rate * g_b1)
+            self._W2.assign_sub(self._args.learning_rate * g_W2)
+            self._b2.assign_sub(self._args.learning_rate * g_b2)
 
     def evaluate(self, dataset):
         # Compute the accuracy of the model prediction
         correct = 0
         for batch in dataset.batches(self._args.batch_size):
             # TODO(sgd_backpropagation): Compute the probabilities of the batch images
-            probabilities = ...
+            probabilities = self.predict(batch["images"])[3]
 
             # TODO(sgd_backpropagation): Evaluate how many batch examples were predicted
             # correctly and increase `correct` variable accordingly.
-            correct += ...
+            correct += tf.reduce_sum(tf.cast(tf.equal(tf.argmax(probabilities, axis=1), batch["labels"]), tf.float32))
 
         return correct / dataset.size
 
@@ -126,28 +142,30 @@ def main(args):
     mnist = MNIST()
 
     # Create the TensorBoard writer
-    writer = tf.summary.create_file_writer(args.logdir, flush_millis=10*1000)
+    writer = tf.summary.create_file_writer(args.logdir, flush_millis=10 * 1000)
 
     # Create the model
     model = Model(args)
 
     for epoch in range(args.epochs):
         # TODO(sgd_backpropagation): Run the `train_epoch` with `mnist.train` dataset
+        model.train_epoch(mnist.train)
 
         # TODO(sgd_backpropagation): Evaluate the dev data using `evaluate` on `mnist.dev` dataset
-        accuracy = ...
+        accuracy = model.evaluate(mnist.dev)
         print("Dev accuracy after epoch {} is {:.2f}".format(epoch + 1, 100 * accuracy), flush=True)
         with writer.as_default():
             tf.summary.scalar("dev/accuracy", 100 * accuracy, step=epoch + 1)
 
     # TODO(sgd_backpropagation): Evaluate the test data using `evaluate` on `mnist.test` dataset
-    accuracy = ...
+    accuracy = model.evaluate(mnist.test)
     print("Test accuracy after epoch {} is {:.2f}".format(epoch + 1, 100 * accuracy), flush=True)
     with writer.as_default():
         tf.summary.scalar("test/accuracy", 100 * accuracy, step=epoch + 1)
 
     # Return test accuracy for ReCodEx to validate
     return accuracy.numpy()
+
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
