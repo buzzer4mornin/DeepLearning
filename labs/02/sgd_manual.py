@@ -32,7 +32,9 @@ class Model(tf.Module):
         # - _W2, which is a trainable Variable of size [args.hidden_layer, MNIST.LABELS],
         #   initialized to `tf.random.normal` value with stddev=0.1 and seed=args.seed,
         # - _b2, which is a trainable Variable of size [MNIST.LABELS] initialized to zeros
-        ...
+        self._W2 = tf.Variable(tf.random.normal([args.hidden_layer, MNIST.LABELS], stddev=0.1, seed=args.seed),
+                               trainable=True)
+        self._b2 = tf.Variable(tf.zeros([MNIST.LABELS]), trainable=True)
 
     def predict(self, inputs):
         # TODO(sgd_backpropagation): Define the computation of the network. Notably:
@@ -43,11 +45,15 @@ class Model(tf.Module):
         # - apply `tf.nn.tanh`
         # - multiply the result by `self._W2` and then add `self._b2`
         # - finally apply `tf.nn.softmax` and return the result
+        inputs = tf.reshape(inputs, [inputs.shape[0], -1])
+        hidden_in = tf.matmul(inputs, self._W1) + self._b1
+        hidden_out = tf.nn.tanh(hidden_in)
+        outputs = tf.nn.softmax(tf.matmul(hidden_out, self._W2) + self._b2)
 
         # TODO: In order to support manual gradient computation, you should
         # return not only the output layer, but also the hidden layer after applying
         # tf.nn.tanh, and the input layer after reshaping.
-        return ..., ..., ...
+        return inputs, hidden, outputs
 
     def train_epoch(self, dataset):
         for batch in dataset.batches(self._args.batch_size):
@@ -61,6 +67,7 @@ class Model(tf.Module):
             # the gradient manually, without tf.GradientTape. ReCodEx checks
             # that `tf.GradientTape` is not used and if it is, your solution does
             # not pass.
+            inputs, hidden, outputs = self.predict(batch["images"])
 
             # TODO: Compute the input layer, hidden layer and output layer
             # of the batch images using `self.predict`.

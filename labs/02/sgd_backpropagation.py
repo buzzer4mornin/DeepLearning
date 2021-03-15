@@ -52,8 +52,8 @@ class Model(tf.Module):
         # - finally apply `tf.nn.softmax` and return the result
         inputs = tf.reshape(inputs, [inputs.shape[0], -1])
         hidden = tf.nn.tanh(tf.matmul(inputs, self._W1) + self._b1)
-        out = tf.nn.softmax(tf.matmul(hidden, self._W2) + self._b2)
-        return out
+        outputs = tf.nn.softmax(tf.matmul(hidden, self._W2) + self._b2)
+        return outputs
 
     def train_epoch(self, dataset):
         for batch in dataset.batches(self._args.batch_size):
