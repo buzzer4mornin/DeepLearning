@@ -93,7 +93,6 @@ class Model(tf.Module):
             #   `A[:, :, tf.newaxis] * B[:, tf.newaxis, :]`
             # or with
             #   `tf.einsum("ai,aj->aij", A, B)`
-
             g_output = -1 * tf.one_hot(batch["labels"], outputs.shape[1]) + outputs
             g_b2 = tf.reduce_mean(g_output, axis=0)
             g_W2 = tf.reduce_mean(tf.einsum("ai,aj->aji", g_output, hidden_out), axis=0)
