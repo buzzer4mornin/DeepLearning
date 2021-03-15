@@ -105,8 +105,6 @@ class Model(tf.Module):
             # print(batch["labels"])
             correct += tf.reduce_sum(tf.cast(tf.equal(tf.argmax(probabilities, axis=1), batch["labels"]), tf.float32))
             # OR THIS -> np.sum((tf.math.argmax(probabilities, axis=1)).numpy() == batch["labels"])
-
-
         return correct / dataset.size
 
 
@@ -133,20 +131,19 @@ def main(args):
     # Create the model
     model = Model(args)
 
-    print(model.evaluate(mnist.test))
-    exit()
-
     for epoch in range(args.epochs):
         # TODO: Run the `train_epoch` with `mnist.train` dataset
+        model.train_epoch(mnist.train)
 
         # TODO: Evaluate the dev data using `evaluate` on `mnist.dev` dataset
-        accuracy = ...
+        accuracy = model.evaluate(mnist.dev)
+        
         print("Dev accuracy after epoch {} is {:.2f}".format(epoch + 1, 100 * accuracy), flush=True)
         with writer.as_default():
             tf.summary.scalar("dev/accuracy", 100 * accuracy, step=epoch + 1)
 
     # TODO: Evaluate the test data using `evaluate` on `mnist.test` dataset
-    accuracy = ...
+    accuracy = model.evaluate(mnist.test)
     print("Test accuracy after epoch {} is {:.2f}".format(epoch + 1, 100 * accuracy), flush=True)
     with writer.as_default():
         tf.summary.scalar("test/accuracy", 100 * accuracy, step=epoch + 1)
