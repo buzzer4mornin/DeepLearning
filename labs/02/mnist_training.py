@@ -3,7 +3,8 @@ import argparse
 import datetime
 import os
 import re
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by default
+
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # Report only TF errors by default
 
 import numpy as np
 import tensorflow as tf
@@ -23,6 +24,8 @@ parser.add_argument("--optimizer", default="SGD", type=str, help="Optimizer to u
 parser.add_argument("--recodex", default=False, action="store_true", help="Evaluation in ReCodEx.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+
+
 # If you add more arguments, ReCodEx will keep them with your default values.
 
 def main(args):
@@ -75,15 +78,38 @@ def main(args):
     #   learning rate after every epoch. Additionally, you can find out the current learning
     #   rate manually by using `model.optimizer.learning_rate(model.optimizer.iterations)`,
     #   so after training this value should be `args.learning_rate_final`.
+    if args.decay is None:
+        lr = args.learning_rate
+
+    elif args.decay == "polynomial":
+        lr = tf.keras.optimizers.schedules.PolynomialDecay(args.learning_rate,
+                                                           args.epochs * mnist.train.size / args.batch_size,
+                                                           args.learning_rate_final)
+    elif args.decay == 'exponential':
+        lr = tf.keras.optimizers.schedules.ExponentialDecay(args.learning_rate,
+                                                            args.epochs * mnist.train.size / args.batch_size,
+                                                            args.learning_rate_final / args.learning_rate,
+                                                            staircase=False)
+
+    if args.optimizer == 'Adam':
+        opt = tf.keras.optimizers.Adam(
+            learning_rate=lr)
+
+    elif args.optimizer == 'SGD':
+        if args.momentum is None:
+            momentum = 0
+        else:
+            momentum = args.momentum
+        opt = tf.keras.optimizers.SGD(learning_rate=lr, momentum=momentum)
 
     model.compile(
-        optimizer=...,
+        optimizer=opt,
         loss=tf.losses.SparseCategoricalCrossentropy(),
         metrics=[tf.metrics.SparseCategoricalAccuracy("accuracy")],
     )
 
     tb_callback = tf.keras.callbacks.TensorBoard(args.logdir, histogram_freq=1, update_freq=100, profile_batch=0)
-    tb_callback._close_writers = lambda: None # Ugly hack allowing to log also test data metrics.
+    tb_callback._close_writers = lambda: None  # Ugly hack allowing to log also test data metrics.
     model.fit(
         mnist.train.data["images"], mnist.train.data["labels"],
         batch_size=args.batch_size, epochs=args.epochs,
@@ -98,6 +124,7 @@ def main(args):
 
     # Return test accuracy for ReCodEx to validate
     return test_logs["accuracy"]
+
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
