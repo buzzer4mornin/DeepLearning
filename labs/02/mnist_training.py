@@ -29,7 +29,7 @@ parser.add_argument("--threads", default=1, type=int, help="Maximum number of th
 # If you add more arguments, ReCodEx will keep them with your default values.
 
 def main(args):
-    # Fix random seeds and threads
+    ## Fix random seeds and threads
     np.random.seed(args.seed)
     tf.random.set_seed(args.seed)
     tf.config.threading.set_inter_op_parallelism_threads(args.threads)
