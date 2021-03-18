@@ -7,3 +7,5 @@ All created content is available under
 [CC BY-NC-SA 4.0 license](https://creativecommons.org/licenses/by-nc-sa/4.0/),
 while all existing materials (mostly images and excerpts from papers) are
 properly referenced and are subject to original licensing.
+
+git pull upstream master
