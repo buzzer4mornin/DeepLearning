@@ -71,12 +71,24 @@ def main(args):
     # (i.e., `mnist.{train,dev,test}.data["labels"]`) from indices of the gold class
     # to a full categorical distribution (you can use either NumPy or there is
     # a helper method also in the `tf.keras.utils`).
+    if args.label_smoothing != 0:
+        def gold_to_full(*args):
+            return [tf.one_hot(x, tf.cast(tf.math.reduce_max(x) + 1, dtype=tf.int32)) for x in args]
 
-    model.compile(
-        optimizer=tf.optimizers.Adam(),
-        loss=tf.losses.SparseCategoricalCrossentropy(),
-        metrics=[tf.metrics.SparseCategoricalAccuracy(name="accuracy")],
-    )
+        mnist.train.data["labels"], mnist.dev.data["labels"], mnist.test.data["labels"] = gold_to_full(
+            mnist.train.data["labels"], mnist.dev.data["labels"], mnist.test.data["labels"]
+        )
+        model.compile(
+            optimizer=tf.optimizers.Adam(),
+            loss=tf.losses.CategoricalCrossentropy(label_smoothing=args.label_smoothing),
+            metrics=[tf.metrics.CategoricalAccuracy(name="accuracy", label_smoothing=args.label_smoothing)],
+        )
+    else:
+        model.compile(
+            optimizer=tf.optimizers.Adam(),
+            loss=tf.losses.SparseCategoricalCrossentropy,
+            metrics=[tf.metrics.SparseCategoricalAccuracy(name="accuracy")],
+        )
 
     tb_callback = tf.keras.callbacks.TensorBoard(args.logdir, histogram_freq=1, update_freq=100, profile_batch=0)
     tb_callback._close_writers = lambda: None  # Ugly hack allowing to log also test data metrics.
