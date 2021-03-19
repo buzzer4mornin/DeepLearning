@@ -75,7 +75,7 @@ class Model(tf.Module):
                 #   predicted probabilities and gold batch label
                 # - finally, compute the average across the batch examples
                 y_true = tf.one_hot(batch["labels"], probabilities.shape[1])
-                loss = tf.math.reduce_mean(tf.keras.losses.categorical_crossentropy(probabilities, y_true))
+                loss = tf.math.reduce_mean(tf.keras.losses.categorical_crossentropy(y_true, probabilities))
 
             # We create a list of all variables. Note that a `tf.Module` automatically
             # tracks owned variables, so we could also used `self.trainable_variables`
