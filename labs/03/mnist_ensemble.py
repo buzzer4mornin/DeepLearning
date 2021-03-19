@@ -76,20 +76,16 @@ def main(args):
         #    which averages the models in the ensemble (using
         #    `tf.keras.layers.Average`). Then you can compile the model
         #    with the required metric and use `model.evaluate`.
-
-        y_list = [models[m].predict(mnist.dev.data["images"], batch_size=args.batch_size) for m in range(model+1)]
-
-        if model == 1:
-            outputs = tf.keras.layers.average([y_list])
-            print(len(outputs))
-        continue
-
         # 2) Manually perform the averaging (using TF or NumPy). In this case
         #    you do not need to construct Keras ensemble model at all,
         #    and instead call `model.predict` on individual models and
         #    average the results. To measure accuracy, either do it completely
         #    manually or use `tf.metrics.SparseCategoricalAccuracy`.
-        ensemble_accuracy = None
+
+        y_list = sum([models[m].predict(mnist.dev.data["images"], batch_size=args.batch_size) for m in range(model + 1)])
+        metric = tf.keras.metrics.SparseCategoricalAccuracy()
+        metric.update_state(mnist.dev.data["labels"], y_list)
+        ensemble_accuracy = metric.result()
 
         # Store the accuracies
         individual_accuracies.append(individual_accuracy)
