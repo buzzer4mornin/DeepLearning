@@ -82,7 +82,8 @@ def main(args):
         #    average the results. To measure accuracy, either do it completely
         #    manually or use `tf.metrics.SparseCategoricalAccuracy`.
 
-        y_list = sum([models[m].predict(mnist.dev.data["images"], batch_size=args.batch_size) for m in range(model + 1)])
+        y_list = [models[m].predict(mnist.dev.data["images"], batch_size=args.batch_size) for m in range(model + 1)]
+        y_list = sum(y_list)/len(y_list)
         metric = tf.keras.metrics.SparseCategoricalAccuracy()
         metric.update_state(mnist.dev.data["labels"], y_list)
         ensemble_accuracy = metric.result()
