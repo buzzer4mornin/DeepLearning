@@ -55,12 +55,15 @@ def main(args):
     #   Add a `tf.keras.layers.Dropout` with `args.dropout` rate after the Flatten
     #   layer and after each Dense hidden layer (but not after the output Dense layer).
     reg = tf.keras.regularizers.l2(l2=args.l2) if args.l2 != 0 else None
+
     model = tf.keras.Sequential()
     model.add(tf.keras.layers.Flatten(input_shape=[MNIST.H, MNIST.W, MNIST.C]))
-    model.add(tf.keras.layers.Dropout(args.dropout))
+    if args.dropout != 0:
+        model.add(tf.keras.layers.Dropout(args.dropout))
     for hidden_layer in args.hidden_layers:
         model.add(tf.keras.layers.Dense(hidden_layer, activation=tf.nn.relu, kernel_regularizer=reg))
-        model.add(tf.keras.layers.Dropout(args.dropout))
+        if args.dropout != 0:
+            model.add(tf.keras.layers.Dropout(args.dropout))
     model.add(tf.keras.layers.Dense(MNIST.LABELS, activation=tf.nn.softmax, kernel_regularizer=reg))
 
     # TODO: Implement label smoothing.
@@ -78,15 +81,16 @@ def main(args):
         mnist.train.data["labels"], mnist.dev.data["labels"], mnist.test.data["labels"] = gold_to_full(
             mnist.train.data["labels"], mnist.dev.data["labels"], mnist.test.data["labels"]
         )
+
         model.compile(
             optimizer=tf.optimizers.Adam(),
             loss=tf.losses.CategoricalCrossentropy(label_smoothing=args.label_smoothing),
-            metrics=[tf.metrics.CategoricalAccuracy(name="accuracy", label_smoothing=args.label_smoothing)],
+            metrics=[tf.metrics.CategoricalAccuracy(name="accuracy")],
         )
     else:
         model.compile(
             optimizer=tf.optimizers.Adam(),
-            loss=tf.losses.SparseCategoricalCrossentropy,
+            loss=tf.losses.SparseCategoricalCrossentropy(),
             metrics=[tf.metrics.SparseCategoricalAccuracy(name="accuracy")],
         )
 
