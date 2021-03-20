@@ -3,10 +3,12 @@ import argparse
 import datetime
 import os
 import re
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by default
+
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # Report only TF errors by default
 
 import numpy as np
 import tensorflow as tf
+
 
 def evaluate_model(model, seed=42, episodes=100, render=False, report_per_episode=False):
     """Evaluate the given model on CartPole-v1 environment.
@@ -43,6 +45,7 @@ def evaluate_model(model, seed=42, episodes=100, render=False, report_per_episod
             print("The episode {} finished with score {}.".format(episode + 1, score))
     return total_score / episodes
 
+
 parser = argparse.ArgumentParser()
 # These arguments will be set appropriately by ReCodEx, even if you change them.
 parser.add_argument("--evaluate", default=False, action="store_true", help="Evaluate the given model")
@@ -51,9 +54,10 @@ parser.add_argument("--render", default=False, action="store_true", help="Render
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
 # If you add more arguments, ReCodEx will keep them with your default values.
-parser.add_argument("--batch_size", default=None, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=None, type=int, help="Number of epochs.")
+parser.add_argument("--batch_size", default=10, type=int, help="Batch size.")
+parser.add_argument("--epochs", default=100, type=int, help="Number of epochs.")
 parser.add_argument("--model", default="gym_cartpole_model.h5", type=str, help="Output model path.")
+
 
 def main(args):
     # Fix random seeds and threads
@@ -67,26 +71,38 @@ def main(args):
         args.logdir = os.path.join("logs", "{}-{}-{}".format(
             os.path.basename(globals().get("__file__", "notebook")),
             datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"),
-            ",".join(("{}={}".format(re.sub("(.)[^_]*_?", r"\1", key), value) for key, value in sorted(vars(args).items())))
+            ",".join(
+                ("{}={}".format(re.sub("(.)[^_]*_?", r"\1", key), value) for key, value in sorted(vars(args).items())))
         ))
 
         # Load the data
         data = np.loadtxt("gym_cartpole_data.txt")
         observations, labels = data[:, :-1], data[:, -1].astype(np.int32)
 
+
         # TODO: Create the model in the `model` variable. Note that
         # the model can perform any of:
         # - binary classification with 1 output and sigmoid activation;
         # - two-class classification with 2 outputs and softmax activation.
-        model = ...
+        model = tf.keras.Sequential([
+            tf.keras.layers.InputLayer([observations.shape[1]]),
+            tf.keras.layers.Dense(200, activation=tf.nn.relu),
+            tf.keras.layers.Dense(2, activation=tf.nn.softmax), ])
 
         # TODO: Prepare the model for training using the `model.compile` method.
-        model.compile(...)
+        model.compile(
+            optimizer=tf.keras.optimizers.Adam(),
+            loss=tf.losses.SparseCategoricalCrossentropy(),
+            metrics=[tf.metrics.SparseCategoricalAccuracy("accuracy")],
+        )
 
-        tb_callback=tf.keras.callbacks.TensorBoard(args.logdir, update_freq=100, profile_batch=0)
+        # random_subset = np.random.choice(observations.shape[0], 20, replace=False)
+        # dev_in, dev_out = observations[random_subset], labels[random_subset]
+        tb_callback = tf.keras.callbacks.TensorBoard(args.logdir, update_freq=100, profile_batch=0)
         model.fit(
             observations, labels,
             batch_size=args.batch_size, epochs=args.epochs,
+            # validation_data=(dev_in, dev_out),
             callbacks=[tb_callback]
         )
 
@@ -100,8 +116,9 @@ def main(args):
         if args.recodex:
             return model
         else:
-            score = evaluate_model(model, seed=args.seed, episodes=2, render=args.render, report_per_episode=True)
+            score = evaluate_model(model, seed=args.seed, episodes=100, render=args.render, report_per_episode=True)
             print("The average score was {}.".format(score))
+
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
