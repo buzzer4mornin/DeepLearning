@@ -4,7 +4,8 @@ import datetime
 import os
 import re
 import pickle
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by default
+
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # Report only TF errors by default
 
 import numpy as np
 import tensorflow as tf
@@ -14,12 +15,20 @@ from uppercase_data import UppercaseData
 # TODO: Set reasonable values for the hyperparameters, notably
 # for `alphabet_size` and `window` and others.
 parser = argparse.ArgumentParser()
-parser.add_argument("--alphabet_size", default=50, type=int, help="If nonzero, limit alphabet to this many most frequent chars.")
+parser.add_argument("--alphabet_size", default=50, type=int,
+                    help="If nonzero, limit alphabet to this many most frequent chars.")
 parser.add_argument("--batch_size", default=1000, type=int, help="Batch size.")
 parser.add_argument("--epochs", default=500, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
 parser.add_argument("--window", default=4, type=int, help="Window size to use.")
+
+# my additional args
+parser.add_argument("--dropout", default=0, type=float, help="Dropout regularization.")
+parser.add_argument("--l2", default=0, type=float, help="L2 regularization.")
+parser.add_argument("--label_smoothing", default=0, type=float, help="Label smoothing.")
+parser.add_argument("--hidden_layers", default=[100, 100], nargs="*", type=int, help="Hidden layer sizes.")
+
 
 def main(args):
     # Fix random seeds and threads
@@ -66,7 +75,24 @@ def main(args):
     #   You can then flatten the one-hot encoded windows and follow with a dense layer.
     # - Alternatively, you can use `tf.keras.layers.Embedding` (which is an efficient
     #   implementation of one-hot encoding followed by a Dense layer) and flatten afterwards.
-    model = ...
+
+    # Set Regularization Parameter
+    reg = tf.keras.regularizers.l2(l2=args.l2) if args.l2 != 0 else None
+
+    # Create Model
+    model = tf.keras.Sequential()
+    model.add(tf.keras.layers.InputLayer(input_shape=[2 * args.window + 1], dtype=tf.int32))
+    model.add(tf.keras.layers.Lambda(lambda x: tf.one_hot(x, len(uppercase_data.train.alphabet))))
+    model.add(tf.keras.layers.Flatten(input_shape=[2 * args.window + 1]))
+    if args.dropout != 0:
+        model.add(tf.keras.layers.Dropout(args.dropout))
+    for hidden_layer in args.hidden_layers:
+        model.add(tf.keras.layers.Dense(hidden_layer, activation=tf.nn.relu))
+        if args.dropout != 0:
+            model.add(tf.keras.layers.Dropout(args.dropout))
+    model.add(tf.keras.layers.Dense(1, activation=tf.nn.sigmoid, kernel_regularizer=reg))
+
+
 
     # TODO: Generate correctly capitalized test set.
     # Use `uppercase_data.test.text` as input, capitalize suitable characters,
@@ -74,6 +100,7 @@ def main(args):
     # `uppercase_test.txt` in the `args.logdir` directory).
     with open(os.path.join(args.logdir, "uppercase_test.txt"), "w", encoding="utf-8") as predictions_file:
         ...
+
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
