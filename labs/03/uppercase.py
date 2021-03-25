@@ -3,6 +3,7 @@ import argparse
 import datetime
 import os
 import re
+import pickle
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by default
 
 import numpy as np
@@ -13,13 +14,12 @@ from uppercase_data import UppercaseData
 # TODO: Set reasonable values for the hyperparameters, notably
 # for `alphabet_size` and `window` and others.
 parser = argparse.ArgumentParser()
-parser = argparse.ArgumentParser()
-parser.add_argument("--alphabet_size", default=None, type=int, help="If nonzero, limit alphabet to this many most frequent chars.")
-parser.add_argument("--batch_size", default=None, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=None, type=int, help="Number of epochs.")
+parser.add_argument("--alphabet_size", default=50, type=int, help="If nonzero, limit alphabet to this many most frequent chars.")
+parser.add_argument("--batch_size", default=1000, type=int, help="Batch size.")
+parser.add_argument("--epochs", default=500, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
-parser.add_argument("--window", default=None, type=int, help="Window size to use.")
+parser.add_argument("--window", default=4, type=int, help="Window size to use.")
 
 def main(args):
     # Fix random seeds and threads
@@ -36,7 +36,15 @@ def main(args):
     ))
 
     # Load data
-    uppercase_data = UppercaseData(args.window, args.alphabet_size)
+    # uppercase_data = UppercaseData(args.window, args.alphabet_size)
+    # Save data for easy access
+    # with open("uppercase_alphabet.model", 'wb') as f:
+    #    pickle.dump(uppercase_data, f)
+
+    # Load saved data
+    # DATA PARAMETERS: train.size = 6,111,990 || test.size  = 363,932 || dev.size   = 362,988
+    with open("uppercase_alphabet.model", 'rb') as f:
+        uppercase_data = pickle.load(f)
 
     # TODO: Implement a suitable model, optionally including regularization, select
     # good hyperparameters and train the model.
