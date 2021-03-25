@@ -15,18 +15,15 @@ from uppercase_data import UppercaseData
 # TODO: Set reasonable values for the hyperparameters, notably
 # for `alphabet_size` and `window` and others.
 parser = argparse.ArgumentParser()
-parser.add_argument("--alphabet_size", default=50, type=int,
-                    help="If nonzero, limit alphabet to this many most frequent chars.")
+parser.add_argument("--alphabet_size", default=50, type=int, help="If nonzero, limit alphabet to this many most frequent chars.")
 parser.add_argument("--batch_size", default=1000, type=int, help="Batch size.")
 parser.add_argument("--epochs", default=500, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
 parser.add_argument("--window", default=4, type=int, help="Window size to use.")
-
 # my additional args
 parser.add_argument("--dropout", default=0, type=float, help="Dropout regularization.")
 parser.add_argument("--l2", default=0, type=float, help="L2 regularization.")
-parser.add_argument("--label_smoothing", default=0, type=float, help="Label smoothing.")
 parser.add_argument("--hidden_layers", default=[100, 100], nargs="*", type=int, help="Hidden layer sizes.")
 
 
@@ -76,10 +73,8 @@ def main(args):
     # - Alternatively, you can use `tf.keras.layers.Embedding` (which is an efficient
     #   implementation of one-hot encoding followed by a Dense layer) and flatten afterwards.
 
-    # Set Regularization Parameter
-    reg = tf.keras.regularizers.l2(l2=args.l2) if args.l2 != 0 else None
-
-    # Create Model
+    # ----------------------------------------- Create Model -----------------------------------------------------------
+    reg = tf.keras.regularizers.l2(l2=args.l2) if args.l2 != 0 else None  # set regularization
     model = tf.keras.Sequential()
     model.add(tf.keras.layers.InputLayer(input_shape=[2 * args.window + 1], dtype=tf.int32))
     model.add(tf.keras.layers.Lambda(lambda x: tf.one_hot(x, len(uppercase_data.train.alphabet))))
@@ -91,6 +86,31 @@ def main(args):
         if args.dropout != 0:
             model.add(tf.keras.layers.Dropout(args.dropout))
     model.add(tf.keras.layers.Dense(1, activation=tf.nn.sigmoid, kernel_regularizer=reg))
+
+    # ------------------------------------- Set Learning Rate ----------------------------------------------------------
+    if args.decay is None:
+        lr = args.learning_rate
+    elif args.decay == "polynomial":
+        lr = tf.keras.optimizers.schedules.PolynomialDecay(args.learning_rate,
+                                                           args.epochs * uppercase_data.train.size / args.batch_size,
+                                                           args.learning_rate_final)
+    elif args.decay == 'exponential':
+        lr = tf.keras.optimizers.schedules.ExponentialDecay(args.learning_rate,
+                                                            args.epochs * uppercase_data.train.size / args.batch_size,
+                                                            args.learning_rate_final / args.learning_rate,
+                                                            staircase=False)
+    # Compile Model
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=lr),
+        loss=tf.keras.losses.BinaryCrossentropy(),
+        metrics=[tf.metrics.BinaryAccuracy(name="accuracy")]
+    )
+
+    model.summary()
+
+
+
+
 
 
 
