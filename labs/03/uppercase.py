@@ -99,6 +99,7 @@ def main(args):
                                                             args.epochs * uppercase_data.train.size / args.batch_size,
                                                             args.learning_rate_final / args.learning_rate,
                                                             staircase=False)
+
     # ---------------------------------------- Compile Model -----------------------------------------------------------
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=lr),
