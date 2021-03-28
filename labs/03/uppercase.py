@@ -17,13 +17,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--alphabet_size", default=50, type=int,
                     help="If nonzero, limit alphabet to this many most frequent chars.")
 parser.add_argument("--batch_size", default=1000, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=1, type=int, help="Number of epochs.")
+parser.add_argument("--epochs", default=20, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=4, type=int, help="Maximum number of threads to use.")
 parser.add_argument("--window", default=4, type=int, help="Window size to use.")
 # my additional args
 parser.add_argument("--dropout", default=0.1, type=float, help="Dropout regularization.")
-parser.add_argument("--l2", default=0.0001, type=float, help="L2 regularization.")
+parser.add_argument("--l2", default=0.00001, type=float, help="L2 regularization.")
 parser.add_argument("--hidden_layers", default=[100, 100, 100], nargs="*", type=int, help="Hidden layer sizes.")
 parser.add_argument("--decay", default="polynomial", type=str, help="polynomial | exponential | Learning decay rate type")
 parser.add_argument("--learning_rate", default=0.001, type=float, help="Initial learning rate.")
@@ -142,27 +142,6 @@ def main(args):
         same_dev += dev_text[character] == dev_pred[character]
     print("Accuracy:", 100 * same_dev / len(dev_text))
 
-    # ------------------------------------------- Test on Test ---------------------------------------------------------
-    '''test_text = uppercase_data.test.text
-    prediction = np.round(model.predict(uppercase_data.test.data["windows"], batch_size=args.batch_size))
-    test_pred = ""
-    num_pred = 0
-    for character in range(len(test_text)):
-        if test_text[character].upper() == test_text[character].lower():
-            test_pred = test_pred + test_text[character]
-        else:
-            if prediction[num_pred] == 1:
-                char = test_text[character].upper()
-                test_pred = test_pred + char[0]
-            else:
-                char = test_text[character].lower()
-                test_pred = test_pred + char[0]
-            num_pred += 1
-
-    same_test = 0
-    for character in range(len(test_text)):
-        same_test += test_text[character] == test_pred[character]
-    print("Accuracy:", 100 * same_test / len(test_text))'''
     # -------------------------------------------- Save Model ----------------------------------------------------------
     # TODO: Generate correctly capitalized test set.
     # Use `uppercase_data.test.text` as input, capitalize suitable characters,
