@@ -17,7 +17,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--alphabet_size", default=50, type=int,
                     help="If nonzero, limit alphabet to this many most frequent chars.")
 parser.add_argument("--batch_size", default=1000, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=20, type=int, help="Number of epochs.")
+parser.add_argument("--epochs", default=250, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=4, type=int, help="Maximum number of threads to use.")
 parser.add_argument("--window", default=4, type=int, help="Window size to use.")
@@ -27,7 +27,7 @@ parser.add_argument("--l2", default=0.00001, type=float, help="L2 regularization
 parser.add_argument("--hidden_layers", default=[100, 100, 100], nargs="*", type=int, help="Hidden layer sizes.")
 parser.add_argument("--decay", default="polynomial", type=str, help="polynomial | exponential | Learning decay rate type")
 parser.add_argument("--learning_rate", default=0.001, type=float, help="Initial learning rate.")
-parser.add_argument("--learning_rate_final", default=0, type=float, help="Final learning rate.")
+parser.add_argument("--learning_rate_final", default=0.000001, type=float, help="Final learning rate.")
 
 
 def main(args):
@@ -153,15 +153,7 @@ def main(args):
                    str(args.learning_rate) + '_' + str(args.learning_rate_final) + '_' +
                    str(args.decay) + '_' + str(args.dropout) + '_' + '.h5')'''
     test_prediction = np.round(model.predict(uppercase_data.test.data["windows"], batch_size=args.batch_size))
-    with open('uppercase_test_' + str(args.hidden_layers) + '_' + str(args.alphabet_size) + '_' +
-                   str(args.window) + '_' + str(args.epochs) + '_' + str(args.l2) + '_' +
-                   str(args.learning_rate) + '_' + str(args.learning_rate_final) + '_' +
-                   str(args.decay) + '_' + str(args.dropout) + '.txt', "w", encoding="utf-8") as out_file:
-        for character in range(test_prediction.shape[0]):
-            if test_prediction[character] == 1:
-                print(uppercase_data.test.text[character].upper(), file=out_file, end='')
-            else:
-                print(uppercase_data.test.text[character].lower(), file=out_file, end='')
+
 
 
 if __name__ == "__main__":
