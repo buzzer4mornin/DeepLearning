@@ -17,17 +17,17 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--alphabet_size", default=50, type=int,
                     help="If nonzero, limit alphabet to this many most frequent chars.")
 parser.add_argument("--batch_size", default=1000, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=250, type=int, help="Number of epochs.")
+parser.add_argument("--epochs", default=200, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=4, type=int, help="Maximum number of threads to use.")
 parser.add_argument("--window", default=4, type=int, help="Window size to use.")
 # my additional args
-parser.add_argument("--dropout", default=0.1, type=float, help="Dropout regularization.")
-parser.add_argument("--l2", default=0.00001, type=float, help="L2 regularization.")
-parser.add_argument("--hidden_layers", default=[100, 100, 100], nargs="*", type=int, help="Hidden layer sizes.")
+parser.add_argument("--dropout", default=0, type=float, help="Dropout regularization.")
+parser.add_argument("--l2", default=0.0001, type=float, help="L2 regularization.")
+parser.add_argument("--hidden_layers", default=[100, 100], nargs="*", type=int, help="Hidden layer sizes.")
 parser.add_argument("--decay", default="polynomial", type=str, help="polynomial | exponential | Learning decay rate type")
 parser.add_argument("--learning_rate", default=0.001, type=float, help="Initial learning rate.")
-parser.add_argument("--learning_rate_final", default=0.000001, type=float, help="Final learning rate.")
+parser.add_argument("--learning_rate_final", default=0.0001, type=float, help="Final learning rate.")
 
 
 def main(args):

@@ -23,11 +23,11 @@ parser.add_argument("--threads", default=4, type=int, help="Maximum number of th
 parser.add_argument("--window", default=4, type=int, help="Window size to use.")
 # my additional args
 parser.add_argument("--dropout", default=0.1, type=float, help="Dropout regularization.")
-parser.add_argument("--l2", default=0.00001, type=float, help="L2 regularization.")
-parser.add_argument("--hidden_layers", default=[100, 100, 100], nargs="*", type=int, help="Hidden layer sizes.")
+parser.add_argument("--l2", default=0.000001, type=float, help="L2 regularization.")
+parser.add_argument("--hidden_layers", default=[100, 100], nargs="*", type=int, help="Hidden layer sizes.")
 parser.add_argument("--decay", default="polynomial", type=str, help="polynomial | exponential | Learning decay rate type")
 parser.add_argument("--learning_rate", default=0.001, type=float, help="Initial learning rate.")
-parser.add_argument("--learning_rate_final", default=0.000001, type=float, help="Final learning rate.")
+parser.add_argument("--learning_rate_final", default=0.00005, type=float, help="Final learning rate.")
 
 
 def main(args):
