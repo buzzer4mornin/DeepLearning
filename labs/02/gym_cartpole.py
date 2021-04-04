@@ -117,6 +117,7 @@ def main(args):
             return model
         else:
             score = evaluate_model(model, seed=args.seed, episodes=100, render=args.render, report_per_episode=True)
+
             print("The average score was {}.".format(score))
 
 
