@@ -67,7 +67,9 @@ def main(args):
     # - zoom range of 0.2 (20%),
     # - width shift range and height shift range of 0.1 (10%),
     # - allow horizontal flips
-    train_generator = ...
+    train_generator = tf.keras.preprocessing.image.ImageDataGenerator(rotation_range=20, width_shift_range=0.1,
+                                                                      height_shift_range=0.1, zoom_range=0.2,
+                                                                      horizontal_flip=True)
 
     # TODO: Train using the generator. To augment data, use
     # `train_generator.flow` and specify:
@@ -76,7 +78,8 @@ def main(args):
     # - batch_size of args.batch_size
     # - args.seed as random seed
     logs = model.fit(
-        ...,
+        train_generator.flow(tf.reshape(cifar.train.data["images"],[-1,32,32,3])[:5000], cifar.train.data["labels"][:5000], seed=args.seed,
+                             batch_size=args.batch_size),
         shuffle=False, epochs=args.epochs,
         validation_data=(cifar.dev.data["images"], cifar.dev.data["labels"]),
         callbacks=[tb_callback],
