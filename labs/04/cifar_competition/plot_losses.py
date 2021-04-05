@@ -3,6 +3,7 @@ import numpy as np
 
 train = []
 dev = []
+
 with open('example_losses.txt', 'r') as f:
     for line in f:
         if line.startswith("Epoch"):
