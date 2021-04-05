@@ -101,10 +101,9 @@ def main(args):
     #   to fully saturate the training process
     train = train.take(5000).shuffle(5000, seed=args.seed).map(train_augment).batch(args.batch_size).prefetch(tf.data.AUTOTUNE)
 
-
     # TODO: Prepare the `dev` pipeline
     # - just use `.batch(args.batch_size)` to generate batches
-    dev = ...
+    dev = dev.batch(args.batch_size)
 
     # Train
     logs = model.fit(train, epochs=args.epochs, validation_data=dev, callbacks=[tb_callback])
