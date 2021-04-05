@@ -67,8 +67,12 @@ def main(args):
     # of `from_tensor_slices` -- in our case we want each example to
     # be a pair of `(input_image, target_label)`, so we need to pass
     # a pair `(data["images"], data["labels"])` to `from_tensor_slices`.
-    train = ...
-    dev = ...
+
+    train = tf.data.Dataset.from_tensor_slices(
+        (tf.reshape(cifar.train.data["images"], [-1, CIFAR10.H, CIFAR10.W, CIFAR10.C]), cifar.train.data["labels"]))
+    dev = tf.data.Dataset.from_tensor_slices(
+        (tf.reshape(cifar.dev.data["images"], [-1, CIFAR10.H, CIFAR10.W, CIFAR10.C]), cifar.dev.data["labels"]))
+    exit()
 
     # Simple data augmentation
     generator = tf.random.Generator.from_seed(args.seed)
