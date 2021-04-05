@@ -100,7 +100,7 @@ def main(args):
     #   the training process, dynamically adjusting the number of threads
     #   to fully saturate the training process
     train = train.take(5000).shuffle(5000, seed=args.seed).map(train_augment).batch(args.batch_size).prefetch(tf.data.AUTOTUNE)
-    exit()
+
 
     # TODO: Prepare the `dev` pipeline
     # - just use `.batch(args.batch_size)` to generate batches
