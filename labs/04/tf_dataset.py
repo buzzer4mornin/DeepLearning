@@ -72,10 +72,10 @@ def main(args):
         (tf.reshape(cifar.train.data["images"], [-1, CIFAR10.H, CIFAR10.W, CIFAR10.C]), cifar.train.data["labels"]))
     dev = tf.data.Dataset.from_tensor_slices(
         (tf.reshape(cifar.dev.data["images"], [-1, CIFAR10.H, CIFAR10.W, CIFAR10.C]), cifar.dev.data["labels"]))
-    exit()
 
     # Simple data augmentation
     generator = tf.random.Generator.from_seed(args.seed)
+
     def train_augment(image, label):
         if generator.uniform([]) >= 0.5:
             image = tf.image.flip_left_right(image)
@@ -99,7 +99,8 @@ def main(args):
     #   the last call -- it allows the pipeline to run in parallel with
     #   the training process, dynamically adjusting the number of threads
     #   to fully saturate the training process
-    train = ...
+    train = train.take(5000).shuffle(5000, seed=args.seed).map(train_augment).batch(args.batch_size).prefetch(tf.data.AUTOTUNE)
+    exit()
 
     # TODO: Prepare the `dev` pipeline
     # - just use `.batch(args.batch_size)` to generate batches
