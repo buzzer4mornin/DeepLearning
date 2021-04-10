@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+
+# Team:
+# 3351ff04-3f62-11e9-b0fd-00505601122b
+# ff29975d-0276-11eb-9574-ea7484399335
+
+# Team members: Aydin Ahmadli, Filip Jurčák
+
 import argparse
 import datetime
 import os
@@ -19,6 +26,7 @@ parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
 # If you add more arguments, ReCodEx will keep them with your default values.
 
+
 # The neural network model
 class Network(tf.keras.Model):
     def __init__(self, args):
@@ -36,6 +44,19 @@ class Network(tf.keras.Model):
         # - fully connected layer with 200 neurons and ReLU activation,
         # obtaining a 200-dimensional feature representation of each image.
 
+        conv2D10 = tf.keras.layers.Conv2D(filters=10, kernel_size=3, strides=2, activation=tf.nn.relu)
+        hidden_image_1 = conv2D10(images[0])
+        hidden_image_2 = conv2D10(images[1])
+        conv2D20 = tf.keras.layers.Conv2D(filters=20, kernel_size=3, strides=2, activation=tf.nn.relu)
+        hidden_image_1 = conv2D20(hidden_image_1)
+        hidden_image_2 = conv2D20(hidden_image_2)
+        flatten = tf.keras.layers.Flatten()
+        flatten_image_1 = flatten(hidden_image_1)
+        flatten_image_2 = flatten(hidden_image_2)
+        dense = tf.keras.layers.Dense(units=200, activation=tf.nn.relu)
+        image1_features = dense(flatten_image_1)
+        image2_features = dense(flatten_image_2)
+
         # TODO: Using the computed representations, it should produce four outputs:
         # - first, compute _direct prediction_ whether the first digit is
         #   greater than the second, by
@@ -49,11 +70,28 @@ class Network(tf.keras.Model):
         # - finally, compute _indirect prediction_ whether the first digit
         #   is greater than second, by comparing the predictions from the above
         #   two outputs.
+
+        direct_prediction_input = tf.concat([image1_features, image2_features], axis=1)
+
+        direct_prediction_dense_200 = tf.keras.layers.Dense(units=200, activation=tf.nn.relu)
+        direct_prediction_hidden = direct_prediction_dense_200(direct_prediction_input)
+
+        direct_prediction_output = tf.keras.layers.Dense(units=1, activation=tf.nn.sigmoid)
+        direct_prediction = direct_prediction_output(direct_prediction_hidden)
+
+        classification = tf.keras.layers.Dense(units=10, activation=tf.nn.softmax)
+
+        image1_classification = classification(image1_features)
+        image2_classification = classification(image2_features)
+
         outputs = {
-            "direct_prediction": ...,
-            "digit_1": ...,
-            "digit_2": ...,
-            "indirect_prediction": ...,
+            "direct_prediction": direct_prediction,
+            "digit_1": image1_classification,
+            "digit_2": image2_classification,
+            "indirect_prediction": tf.cast(
+                tf.argmax(image1_classification, axis=1) > tf.argmax(image2_classification, axis=1),
+                dtype=tf.int64
+            ),
         }
 
         # Finally, construct the model.
@@ -73,18 +111,18 @@ class Network(tf.keras.Model):
         self.compile(
             optimizer=tf.keras.optimizers.Adam(),
             loss={
-                "direct_prediction": ...,
-                "digit_1": ...,
-                "digit_2": ...,
+                "direct_prediction": tf.losses.BinaryCrossentropy(),
+                "digit_1": tf.losses.SparseCategoricalCrossentropy(),
+                "digit_2": tf.losses.SparseCategoricalCrossentropy(),
             },
             metrics={
-                "direct_prediction": [...],
-                "indirect_prediction": [...],
+                "direct_prediction": [tf.metrics.BinaryAccuracy(name='accuracy')],
+                "indirect_prediction": [tf.metrics.BinaryAccuracy(name='accuracy')],
             },
         )
 
         self.tb_callback = tf.keras.callbacks.TensorBoard(args.logdir, histogram_freq=1, update_freq=100, profile_batch=0)
-        self.tb_callback._close_writers = lambda: None # A hack allowing to keep the writers open.
+        self.tb_callback._close_writers = lambda: None  # A hack allowing to keep the writers open.
 
     # Create an appropriate dataset using the MNIST data.
     def create_dataset(self, mnist_dataset, args, training=False):
@@ -92,8 +130,11 @@ class Network(tf.keras.Model):
         dataset = tf.data.Dataset.from_tensor_slices((mnist_dataset.data["images"], mnist_dataset.data["labels"]))
 
         # TODO: If `training`, shuffle the data with `buffer_size=10000` and `seed=args.seed`
+        if training:
+            dataset = dataset.shuffle(buffer_size=10000, seed=args.seed)
 
         # TODO: Combine pairs of examples by creating batches of size 2
+        dataset = dataset.batch(2)
 
         # TODO: Map pairs of images to elements suitable for our model. Notably,
         # the elements should be pairs `(input, output)`, with
@@ -101,12 +142,20 @@ class Network(tf.keras.Model):
         # - `output` being a dictionary with keys digit_1, digit_2, direct_prediction
         #   and indirect_prediction.
         def create_element(images, labels):
-            ...
+            output_dict = {
+                'digit_1': labels[0],
+                'digit_2': labels[1],
+                'direct_prediction': 1.0 if labels[0] > labels[1] else 0.0,
+                'indirect_prediction': 1.0 if labels[0] > labels[1] else 0.0
+            }
+            return (images[0], images[1]), output_dict
         dataset = dataset.map(create_element)
 
         # TODO: Create batches of size `args.batch_size`
+        dataset = dataset.batch(args.batch_size)
 
         return dataset
+
 
 def main(args):
     # Fix random seeds and threads
@@ -145,6 +194,7 @@ def main(args):
     network.tb_callback.on_epoch_end(args.epochs, {"val_test_" + metric: value for metric, value in test_logs.items()})
 
     return test_logs
+
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
