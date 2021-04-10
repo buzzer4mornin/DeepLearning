@@ -43,12 +43,25 @@ def main(args):
 
     # Generate test set annotations, but in args.logdir to allow parallel execution.
     os.makedirs(args.logdir, exist_ok=True)
-    with open(os.path.join(args.logdir, "cags_classification.txt"), "w", encoding="utf-8") as predictions_file:
-        # TODO: Predict the probabilities on the test set
-        test_probabilities = model.predict(...)
+    with open(os.path.join(args.logdir, "cags_segmentation.txt"), "w", encoding="utf-8") as predictions_file:
+        # TODO: Predict the masks on the test set
+        test_masks = model.predict(...)
 
-        for probs in test_probabilities:
-            print(np.argmax(probs), file=predictions_file)
+        for mask in test_masks:
+            zeros, ones, runs = 0, 0, []
+            for pixel in np.reshape(mask >= 0.5, [-1]):
+                if pixel:
+                    if zeros or (not zeros and not ones):
+                        runs.append(zeros)
+                        zeros = 0
+                    ones += 1
+                else:
+                    if ones:
+                        runs.append(ones)
+                        ones = 0
+                    zeros += 1
+            runs.append(zeros + ones)
+            print(*runs, file=predictions_file)
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)

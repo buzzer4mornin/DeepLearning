@@ -8,13 +8,13 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by de
 import numpy as np
 import tensorflow as tf
 
-from cags_dataset import CAGS
-import efficient_net
+from modelnet import ModelNet
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=None, type=int, help="Batch size.")
 parser.add_argument("--epochs", default=None, type=int, help="Number of epochs.")
+parser.add_argument("--modelnet", default=20, type=int, help="ModelNet dimension.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
 
@@ -33,17 +33,14 @@ def main(args):
     ))
 
     # Load the data
-    cags = CAGS()
-
-    # Load the EfficientNet-B0 model
-    efficientnet_b0 = efficient_net.pretrained_efficientnet_b0(include_top=False)
+    modelnet = ModelNet(args.modelnet)
 
     # TODO: Create the model and train it
     model = ...
 
     # Generate test set annotations, but in args.logdir to allow parallel execution.
     os.makedirs(args.logdir, exist_ok=True)
-    with open(os.path.join(args.logdir, "cags_classification.txt"), "w", encoding="utf-8") as predictions_file:
+    with open(os.path.join(args.logdir, "3d_recognition.txt"), "w", encoding="utf-8") as predictions_file:
         # TODO: Predict the probabilities on the test set
         test_probabilities = model.predict(...)
 

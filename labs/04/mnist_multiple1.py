@@ -1,4 +1,3 @@
-# ff29975d-0276-11eb-9574-ea7484399335 (Filip Jurcak), 3351ff04-3f62-11e9-b0fd-00505601122b (Aydin Ahmadli)
 #!/usr/bin/env python3
 import argparse
 import datetime
@@ -8,10 +7,6 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by de
 
 import numpy as np
 import tensorflow as tf
-
-config = tf.compat.v1.ConfigProto()
-config.gpu_options.allow_growth = True
-session = tf.compat.v1.Session(config=config)
 
 from mnist import MNIST
 
@@ -55,7 +50,6 @@ class Network(tf.keras.Model):
         image1_features = dense(flatten_image_1)
         image2_features = dense(flatten_image_2)
 
-
         # TODO: Using the computed representations, it should produce four outputs:
         # - first, compute _direct prediction_ whether the first digit is
         #   greater than the second, by
@@ -76,21 +70,21 @@ class Network(tf.keras.Model):
         direct_prediction_hidden = direct_prediction_dense_200(direct_prediction_input)
 
         direct_prediction_output = tf.keras.layers.Dense(units=1, activation=tf.nn.sigmoid)
-        direct_prediction = tf.round(direct_prediction_output(direct_prediction_hidden))
+        direct_prediction = direct_prediction_output(direct_prediction_hidden)
 
         classification = tf.keras.layers.Dense(units=10, activation=tf.nn.softmax)
 
-        image1_classification = tf.argmax(classification(image1_features), axis=1)
-        image2_classification = tf.argmax(classification(image2_features), axis=1)
-
-        image1_classification = tf.cast(image1_classification, dtype=tf.float64)                #TODO
-        image2_classification = tf.cast(image2_classification, dtype=tf.float64)                #TODO
+        image1_classification = classification(image1_features)
+        image2_classification = classification(image2_features)
 
         outputs = {
             "direct_prediction": direct_prediction,
             "digit_1": image1_classification,
             "digit_2": image2_classification,
-            "indirect_prediction": tf.cast(image1_classification > image2_classification, dtype=tf.float64),
+            "indirect_prediction": tf.cast(
+                tf.argmax(image1_classification, axis=1) > tf.argmax(image2_classification, axis=1),
+                dtype=tf.int64
+            ),
         }
 
         # Finally, construct the model.
@@ -182,7 +176,6 @@ def main(args):
 
     # Construct suitable datasets from the MNIST data.
     train = network.create_dataset(mnist.train, args, training=True)
-
     dev = network.create_dataset(mnist.dev, args)
     test = network.create_dataset(mnist.test, args)
 
