@@ -50,6 +50,7 @@ def main(args):
         for probs in test_probabilities:
             print(np.argmax(probs), file=predictions_file)
 
+
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
     main(args)
