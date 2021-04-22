@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
+# ff29975d-0276-11eb-9574-ea7484399335 (Filip Jurcak), 3351ff04-3f62-11e9-b0fd-00505601122b (Aydin Ahmadli)
 import argparse
 import datetime
-import os
-import re
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by default
-
 import numpy as np
+import os
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # Report only TF errors by default
+
 import tensorflow as tf
+import re
 
 from mnist import MNIST
+
 
 parser = argparse.ArgumentParser()
 # These arguments will be set appropriately by ReCodEx, even if you change them.
@@ -20,6 +22,7 @@ parser.add_argument("--recodex", default=False, action="store_true", help="Evalu
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
 # If you add more arguments, ReCodEx will keep them with your default values.
+
 
 class Convolution:
     def __init__(self, channels, kernel_size, stride, input_shape):
@@ -43,7 +46,13 @@ class Convolution:
         # manually iterate through the individual pixels, batch examples,
         # input channels or output channels. However, you can manually
         # iterate through the kernel size.
-        raise NotImplementedError()
+        batch_size, height, width, _ = inputs.shape
+        output_shape = batch_size, (height - self._kernel_size) // self._stride + 1, (width - self._kernel_size) // self._stride + 1, self._channels
+        outputs = tf.zeros(output_shape)
+        for x in range(self._kernel_size):
+            for y in range(self._kernel_size):
+                outputs += inputs[:, x:x + height - (self._kernel_size - 1):self._stride, y:y + width - (self._kernel_size - 1):self._stride] @ self._kernel[x][y]
+        return tf.nn.relu(outputs + self._bias)
 
     def backward(self, inputs, outputs, outputs_gradient):
         # TODO: Given the inputs of the layer, outputs of the layer
@@ -55,7 +64,52 @@ class Convolution:
         #     [self._kernel, self._bias]
         # - list of gradients of the loss with respect to the layer
         #   variables (in the same order as the previous argument)
-        raise NotImplementedError()
+        before_relu_gradient = outputs_gradient * tf.cast(outputs > 0, tf.float32)
+
+        batch_size, input_height, input_width, _ = inputs.shape
+        kernel_gradient_np = np.zeros([self._kernel_size, self._kernel_size, inputs.shape[3], self._channels])
+        for m in range(self._kernel_size):
+            for n in range(self._kernel_size):
+                kernel_gradient_np[m][n] += tf.reduce_sum(
+                    tf.einsum(
+                        'aijk,aijl->ajikl',
+                        inputs[:, m:m + input_height - (self._kernel_size - 1):self._stride, n:n + input_width - (self._kernel_size - 1):self._stride],
+                        before_relu_gradient
+                    ),
+                    axis=[0, 1, 2]
+                )
+        kernel_gradient = tf.convert_to_tensor(kernel_gradient_np, dtype=tf.float32)
+
+        bias_gradient = tf.reduce_sum(before_relu_gradient, axis=[0, 1, 2])
+
+        input_gradient = tf.zeros(inputs.shape, dtype=tf.float32)
+        before_relu_gradient_expanded = tf.expand_dims(tf.transpose(before_relu_gradient, perm=[0, 3, 1, 2]), axis=-1)
+        batch, height, width, channels = before_relu_gradient.shape
+        expanded = tf.reshape(
+            tf.pad(before_relu_gradient_expanded, tf.constant([[0, 0], [0, 0], [0, 0], [0, 0], [0, self._stride - 1]])),
+            (batch, channels, height, width * self._stride if self._stride > 1 else width)
+        )
+        expanded = tf.transpose(expanded, perm=[0, 1, 3, 2])
+        expanded = tf.expand_dims(expanded, axis=-1)
+        _, height, width, _ = outputs.shape
+        expanded_shape = (batch, channels, height * self._stride, width * self._stride)
+        expanded = tf.reshape(
+            tf.pad(expanded, tf.constant([[0, 0], [0, 0], [0, 0], [0, 0], [0, self._stride - 1]])),
+            expanded_shape
+        )
+        expanded = tf.transpose(expanded, perm=[0, 3, 2, 1])
+        expanded = expanded[:, :input_height - self._kernel_size + 1, :input_width - self._kernel_size + 1, :]
+        expanded = tf.pad(
+            expanded,
+            tf.constant([[0, 0], [self._kernel_size - 1, self._kernel_size - 1], [self._kernel_size - 1, self._kernel_size - 1], [0, 0]])
+        )
+        _, expanded_height, expanded_width, _ = expanded.shape
+        for m in range(self._kernel_size):
+            for n in range(self._kernel_size):
+                input_gradient += expanded[:, self._kernel_size - 1 - m:expanded_height - m, self._kernel_size - 1 - n:expanded_width - n, :] @ tf.transpose(self._kernel[m][n])
+
+        return input_gradient, [self._kernel, self._bias], [kernel_gradient, bias_gradient]
+
 
 class Network:
     def __init__(self, args):
@@ -149,6 +203,7 @@ def main(args):
 
     # Return the test accuracy for ReCodEx to validate.
     return accuracy
+
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
