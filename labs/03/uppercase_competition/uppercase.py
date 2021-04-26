@@ -152,6 +152,8 @@ def main(args):
                    str(args.window) + '_' + str(args.epochs) + '_' + str(args.l2) + '_' +
                    str(args.learning_rate) + '_' + str(args.learning_rate_final) + '_' +
                    str(args.decay) + '_' + str(args.dropout) + '_' + '.h5')'''
+
+
     test_prediction = np.round(model.predict(uppercase_data.test.data["windows"], batch_size=args.batch_size))
     with open('uppercase_test_' + str(args.hidden_layers) + '_' + str(args.alphabet_size) + '_' +
                    str(args.window) + '_' + str(args.epochs) + '_' + str(args.l2) + '_' +
