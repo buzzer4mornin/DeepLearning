@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
+# ff29975d-0276-11eb-9574-ea7484399335 (Filip Jurcak), 3351ff04-3f62-11e9-b0fd-00505601122b (Aydin Ahmadli)
+import os
 import numpy as np
 
-BACKEND = np # or you can use `tf` for TensorFlow implementation
+BACKEND = np  # or you can use `tf` for TensorFlow implementation
 
 TOP, LEFT, BOTTOM, RIGHT = range(4)
+
 
 def bboxes_area(bboxes):
     """ Compute area of given set of bboxes.
@@ -15,6 +18,7 @@ def bboxes_area(bboxes):
     """
     return BACKEND.maximum(bboxes[..., BOTTOM] - bboxes[..., TOP], 0) \
         * BACKEND.maximum(bboxes[..., RIGHT] - bboxes[..., LEFT], 0)
+
 
 def bboxes_iou(xs, ys):
     """ Compute IoU of corresponding pairs from two sets of bboxes xs and ys.
@@ -38,6 +42,7 @@ def bboxes_iou(xs, ys):
 
     return intersections_area / (xs_area + ys_area - intersections_area)
 
+
 def bboxes_to_fast_rcnn(anchors, bboxes):
     """ Convert `bboxes` to a Fast-R-CNN-like representation relative to `anchors`.
 
@@ -56,7 +61,28 @@ def bboxes_to_fast_rcnn(anchors, bboxes):
     """
 
     # TODO: Implement according to the docstring.
-    raise NotImplementedError()
+    anchor_height = anchors[:, BOTTOM] - anchors[:, TOP]
+    anchor_width = anchors[:, RIGHT] - anchors[:, LEFT]
+    bbox_height = bboxes[:, BOTTOM] - bboxes[:, TOP]
+    bbox_width = bboxes[:, RIGHT] - bboxes[:, LEFT]
+
+    anchor_x_center = anchors[:, LEFT] + anchor_width / 2
+    anchor_y_center = anchors[:, TOP] + anchor_height / 2
+    bbox_x_center = bboxes[:, LEFT] + bbox_width / 2
+    bbox_y_center = bboxes[:, TOP] + bbox_height / 2
+
+    t_x = (bbox_x_center - anchor_x_center) / anchor_width
+    t_y = (bbox_y_center - anchor_y_center) / anchor_height
+    t_h = np.log(bbox_height / anchor_height)
+    t_w = np.log(bbox_width / anchor_width)
+
+    return np.concatenate([
+        np.reshape(t_y, (t_y.shape[0], 1)) if t_y.shape[0] == 1 else t_y,
+        np.reshape(t_x, (t_x.shape[0], 1)) if t_x.shape[0] == 1 else t_x,
+        np.reshape(t_h, (t_h.shape[0], 1)) if t_h.shape[0] == 1 else t_h,
+        np.reshape(t_w, (t_w.shape[0], 1)) if t_w.shape[0] == 1 else t_w,
+    ], axis=1)
+
 
 def bboxes_from_fast_rcnn(anchors, fast_rcnns):
     """ Convert Fast-R-CNN-like representation relative to `anchor` to a `bbox`.
@@ -65,8 +91,28 @@ def bboxes_from_fast_rcnn(anchors, fast_rcnns):
     the output shape is [anchors_len, 4].
     """
 
+    anchor_height = anchors[:, BOTTOM] - anchors[:, TOP]
+    anchor_width = anchors[:, RIGHT] - anchors[:, LEFT]
+    anchor_x_center = anchors[:, LEFT] + anchor_width / 2
+    anchor_y_center = anchors[:, TOP] + anchor_height / 2
+
+    bbox_center_x = fast_rcnns[:, 0] * anchor_height + anchor_y_center
+    bbox_center_y = fast_rcnns[:, 1] * anchor_width + anchor_x_center
+    bbox_width = anchor_width * np.exp(fast_rcnns[:, 3])
+    bbox_height = anchor_height * np.exp(fast_rcnns[:, 2])
+    bbox_top = bbox_center_x - (bbox_height / 2)
+    bbox_left = bbox_center_y - (bbox_width / 2)
+    bbox_bottom = bbox_top + bbox_height
+    bbox_right = bbox_left + bbox_width
+
     # TODO: Implement according to the docstring.
-    raise NotImplementedError()
+    return np.concatenate([
+        np.reshape(bbox_top, (bbox_top.shape[0], 1)) if bbox_top.shape[0] == 1 else bbox_top,
+        np.reshape(bbox_left, (bbox_left.shape[0], 1)) if bbox_left.shape[0] == 1 else bbox_left,
+        np.reshape(bbox_bottom, (bbox_bottom.shape[0], 1)) if bbox_bottom.shape[0] == 1 else bbox_bottom,
+        np.reshape(bbox_right, (bbox_right.shape[0], 1)) if bbox_right.shape[0] == 1 else bbox_right,
+    ], axis=1)
+
 
 def bboxes_training(anchors, gold_classes, gold_bboxes, iou_threshold):
     """ Compute training data for object detection.
@@ -97,21 +143,53 @@ def bboxes_training(anchors, gold_classes, gold_bboxes, iou_threshold):
       is >= iou_threshold, assign the object to the anchor.
     """
 
+    anchors_assigned = np.array([False] * anchors.shape[0])
+    anchor_classes = np.zeros(anchors.shape[0])
+    anchor_bboxes = np.zeros((anchors.shape[0], 4))
+
+    bboxes_iou_pairs = bboxes_iou(
+        np.reshape(gold_bboxes, (gold_bboxes.shape[0], 1, 4)),
+        np.reshape(anchors, (1, anchors.shape[0], 4))
+    )
+
     # TODO: First, for each gold object, assign it to an anchor with the
     # largest IoU (the one with smaller index if there are several). In case
     # several gold objects are assigned to a single anchor, use the gold object
     # with smaller index.
+    best_anchor_indices = np.argmax(bboxes_iou_pairs, axis=1)
+    for gold_index in range(gold_bboxes.shape[0]):
+        largest_iou_index = best_anchor_indices[gold_index]
+        if not anchors_assigned[largest_iou_index]:
+            anchor_classes[largest_iou_index] = 1 + gold_classes[gold_index]
+            anchor_bboxes[largest_iou_index] = bboxes_to_fast_rcnn(
+                np.array([anchors[largest_iou_index]]),
+                np.array([gold_bboxes[gold_index]]))[0]
+            anchors_assigned[largest_iou_index] = True
 
     # TODO: For each unused anchors, find the gold object with the largest IoU
     # (again the one with smaller index if there are several), and if the IoU
     # is >= threshold, assign the object to the anchor.
+    best_gold_indices = np.argmax(bboxes_iou_pairs, axis=0)
+    for anchor_index in range(anchors.shape[0]):
+        if not anchors_assigned[anchor_index]:
+            largest_iou_index = best_gold_indices[anchor_index]
+            largest_iou = bboxes_iou_pairs[largest_iou_index][anchor_index]
+            if largest_iou >= iou_threshold:
+                anchor_classes[anchor_index] = 1 + gold_classes[largest_iou_index]
+                anchor_bboxes[anchor_index] = bboxes_to_fast_rcnn(
+                    np.array([anchors[anchor_index]]),
+                    np.array([gold_bboxes[largest_iou_index]]))[0]
 
     return anchor_classes, anchor_bboxes
+
 
 def main(args):
     return bboxes_to_fast_rcnn, bboxes_from_fast_rcnn, bboxes_training
 
+
 import unittest
+
+
 class Tests(unittest.TestCase):
     def test_bboxes_to_from_fast_rcnn(self):
         for anchor, bbox, fast_rcnn in [
@@ -152,6 +230,7 @@ class Tests(unittest.TestCase):
             computed_classes, computed_bboxes = bboxes_training(anchors, gold_classes, gold_bboxes, iou)
             np.testing.assert_almost_equal(computed_classes, anchor_classes, decimal=3)
             np.testing.assert_almost_equal(computed_bboxes, anchor_bboxes, decimal=3)
+
 
 if __name__ == '__main__':
     unittest.main()
