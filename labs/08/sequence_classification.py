@@ -28,7 +28,7 @@ parser.add_argument("--train_sequences", default=10000, type=int, help="Number o
 # Dataset for generating sequences, with labels predicting whether the cumulative sum
 # is odd/even.
 class Dataset:
-    def __init__(self, sequences_num, sequence_length, sequence_dim, seed, shuffle_batches=True):
+    def __init__(self, sequences_num, sequence_length, sequence_dim, seed):
         sequences = np.zeros([sequences_num, sequence_length, sequence_dim], np.int32)
         labels = np.zeros([sequences_num, sequence_length, 1], np.bool)
         generator = np.random.RandomState(seed)
@@ -61,12 +61,21 @@ class Network(tf.keras.Model):
         # `tf.keras.layers.RNN` wrapper with `tf.keras.layers.{LSTM,GRU,SimpleRNN}Cell`,
         # because the former can run transparently on a GPU and is also
         # considerably faster on a CPU).
+        if args.rnn_cell == "LSTM":
+            r = tf.keras.layers.LSTM(args.rnn_cell_dim, return_sequences=True)(sequences)
+        elif args.rnn_cell == "GRU":
+            r = tf.keras.layers.GRU(args.rnn_cell_dim, return_sequences=True)(sequences)
+        elif args.rnn_cell == "SimpleRNN":
+            r = tf.keras.layers.SimpleRNN(args.rnn_cell_dim, return_sequences=True)(sequences)
 
         # TODO: If `args.hidden_layer` is nonzero, process the result using
         # a ReLU-activated fully connected layer with `args.hidden_layer` units.
+        if args.hidden_layer > 0:
+            r = tf.keras.layers.Dense(args.hidden_layer, activation="relu")(r)
 
         # TODO: Generate `predictions` using a fully connected layer
         # with one output and `tf.nn.sigmoid` activation.
+        predictions = tf.keras.layers.Dense(1, activation="sigmoid")(r)
 
         super().__init__(inputs=sequences, outputs=predictions)
 
@@ -97,8 +106,8 @@ def main(args):
     ))
 
     # Create the data
-    train = Dataset(args.train_sequences, args.sequence_length, args.sequence_dim, seed=42, shuffle_batches=True)
-    test = Dataset(args.test_sequences, args.sequence_length, args.sequence_dim, seed=43, shuffle_batches=False)
+    train = Dataset(args.train_sequences, args.sequence_length, args.sequence_dim, seed=42)
+    test = Dataset(args.test_sequences, args.sequence_length, args.sequence_dim, seed=43)
 
     # Create the network and train
     network = Network(args)
