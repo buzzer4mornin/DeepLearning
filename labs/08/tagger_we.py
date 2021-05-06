@@ -30,42 +30,56 @@ class Network(tf.keras.Model):
         words = tf.keras.layers.Input(shape=[None], dtype=tf.string, ragged=True)
 
         # TODO: Map strings in `words` to indices by using the `word_mapping` of `train.forms`.
+        mapped_words = train.forms.word_mapping(words)
 
         # TODO: Embed input words with dimensionality `args.we_dim`. Note that the `word_mapping`
         # provides a `vocab_size()` call returning the number of unique words in the mapping.
+        embedded_words = tf.keras.layers.Embedding(train.forms.word_mapping.vocab_size(), args.we_dim)(mapped_words)
 
         # TODO: Create the specified `args.rnn_cell` RNN cell (LSTM, GRU) with
         # dimension `args.rnn_cell_dim`. The cell should produce an output for every
-        # sequence element. Then apply it in a bidirectional way on
+        # sequence element (so a 3D output). Then apply it in a bidirectional way on
         # the embedded words, **summing** the outputs of forward and backward RNNs.
+        if args.rnn_cell == "LSTM":
+            bidirectional = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(args.rnn_cell_dim, return_sequences=True), merge_mode='sum')(embedded_words)
+        elif args.rnn_cell == "GRU":
+            bidirectional = tf.keras.layers.Bidirectional(tf.keras.layers.GRU(args.rnn_cell_dim, return_sequences=True), merge_mode='sum')(embedded_words)
 
         # TODO: Add a softmax classification layer into as many classes as there are unique
-        # tags in the `word_mapping` of `train tags`. However, because we are applying the
+        # tags in the `word_mapping` of `train.tags`. However, because we are applying the
         # the Dense layer to a ragged tensor, we need to wrap the Dense layer in
         # a tf.keras.layers.TimeDistributed.
+        # .to_tensor()
+        predictions = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(train.tags.word_mapping.vocab_size(), activation="softmax"))(bidirectional)
 
+        # Check that the created predictions are a 3D tensor.
+        assert predictions.shape.rank == 3
         super().__init__(inputs=words, outputs=predictions)
         self.compile(optimizer=tf.optimizers.Adam(),
                      loss=tf.losses.SparseCategoricalCrossentropy(),
                      metrics=[tf.metrics.SparseCategoricalAccuracy(name="accuracy")])
 
         self.tb_callback = tf.keras.callbacks.TensorBoard(args.logdir, update_freq=100, profile_batch=0)
-        self.tb_callback._close_writers = lambda: None # A hack allowing to keep the writers open.
+        self.tb_callback._close_writers = lambda: None  # A hack allowing to keep the writers open.
 
-    # Note that in TF 2.4, computing losses and metrics on RaggedTensors is not yet
-    # supported (it will be in TF 2.5). Therefore, we override the `train_step` method
-    # to support it, passing the "flattened" predictions and gold data to the loss
-    # and metrics.
+        # Note that in TF 2.4, computing losses and metrics on RaggedTensors is not yet
+        # supported (it will be in TF 2.5). Therefore, we override the `train_step` method
+        # to support it, passing the "flattened" predictions and gold data to the loss
+        # and metrics.
+
     def train_step(self, data):
         x, y = data
         with tf.GradientTape() as tape:
             y_pred = self(x, training=True)
+            # Check that both the gold data and predictions are RaggedTensors.
+            assert isinstance(y_pred, tf.RaggedTensor) and isinstance(y, tf.RaggedTensor)
             loss = self.compiled_loss(y.values, y_pred.values, regularization_losses=self.losses)
         self.optimizer.minimize(loss, self.trainable_variables, tape=tape)
         self.compiled_metrics.update_state(y.values, y_pred.values)
         return {m.name: m.result() for m in self.metrics}
 
-    # Analogously to `train_step`, we also need to override `test_step`.
+        # Analogously to `train_step`, we also need to override `test_step`.
+
     def test_step(self, data):
         x, y = data
         y_pred = self(x, training=False)
@@ -94,7 +108,6 @@ def main(args):
     # Load the data
     morpho = MorphoDataset("czech_cac", max_sentences=args.max_sentences)
 
-    # Create the network and train
     network = Network(args, morpho.train)
 
     # TODO: Construct dataset for training, which should contain pairs of
@@ -102,7 +115,7 @@ def main(args):
     # - ragged tensor of integral tag ids as targets.
     # To create the identifiers, use the `word_mapping` of `morpho.train.tags`.
     def tagging_dataset(forms, lemmas, tags):
-        raise NotImplementedError()
+        return forms, morpho.train.tags.word_mapping(tags)
 
     train = morpho.train.dataset.map(tagging_dataset).apply(tf.data.experimental.dense_to_ragged_batch(args.batch_size))
     dev = morpho.dev.dataset.map(tagging_dataset).apply(tf.data.experimental.dense_to_ragged_batch(args.batch_size))
