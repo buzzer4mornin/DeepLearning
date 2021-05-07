@@ -25,18 +25,16 @@ from morpho_dataset import MorphoDataset
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=10, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=10, type=int, help="Number of epochs.")
+parser.add_argument("--epochs", default=12, type=int, help="Number of epochs.")
 parser.add_argument("--cle_dim", default=32, type=int, help="CLE embedding dimension.")
 parser.add_argument("--we_dim", default=32, type=int, help="Word embedding dimension.")
-parser.add_argument("--rnn_cell", default="LSTM", type=str, help="RNN cell type.")
+parser.add_argument("--rnn_cell", default="GRU", type=str, help="RNN cell type.")
 parser.add_argument("--rnn_cell_dim", default=32, type=int, help="RNN cell dimension.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=4, type=int, help="Maximum number of threads to use.")
 parser.add_argument("--word_masking", default=0.15, type=float, help="Mask words with the given probability.")
 parser.add_argument("--recodex", default=False, action="store_true", help="Evaluation in ReCodEx.")
 parser.add_argument("--verbose", default=False, action="store_true", help="Verbose TF logging.")
-parser.add_argument("--max_sentences", default=7000, type=int, help="Maximum number of sentences to load.")
-
 
 class Network(tf.keras.Model):
     def __init__(self, args, train):
@@ -65,7 +63,7 @@ class Network(tf.keras.Model):
                 tf.keras.layers.LSTM(args.rnn_cell_dim, return_sequences=True), merge_mode='sum')(concat)
         elif args.rnn_cell == "GRU":
             bidirectional = tf.keras.layers.Bidirectional(
-                tf.keras.layers.GRU(args.rnn_cell_dim, return_sequences=False), merge_mode='sum')(concat)
+                tf.keras.layers.GRU(args.rnn_cell_dim, return_sequences=True), merge_mode='sum')(concat)
 
         predictions = tf.keras.layers.TimeDistributed(
             tf.keras.layers.Dense(train.tags.word_mapping.vocab_size(), activation="softmax"))(bidirectional)
@@ -78,10 +76,6 @@ class Network(tf.keras.Model):
         self.tb_callback = tf.keras.callbacks.TensorBoard(args.logdir, update_freq=100, profile_batch=0)
         self.tb_callback._close_writers = lambda: None  # A hack allowing to keep the writers open.
 
-    # Note that in TF 2.4, computing losses and metrics on RaggedTensors is not yet
-    # supported (it will be in TF 2.5). Therefore, we override the `train_step` method
-    # to support it, passing the "flattened" predictions and gold data to the loss
-    # and metrics.
     def train_step(self, data):
         x, y = data
         with tf.GradientTape() as tape:
@@ -115,8 +109,7 @@ def main(args):
     ))
 
     # Load the data. Using analyses is only optional.
-    morpho = MorphoDataset("czech_cac", max_sentences=args.max_sentences)
-    analyses = MorphoAnalyzer("czech_pdt_analyses")
+    morpho = MorphoDataset("czech_pdt")
 
     # Create the network and train
     model = Network(args, morpho.train)
