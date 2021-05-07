@@ -49,10 +49,12 @@ class Network(tf.keras.Model):
         # use `tf.ones_like` to create a ragged tensor of float32 ones with the same
         # shape as `hidden`, pass them through a dropout layer with `args.word_masking`
         # rate, and finally set the input word ids to 0 where the result of dropout is zero.
+
         masked = tf.ones_like(mapped_words, dtype=tf.dtypes.float32)
         masked = tf.keras.layers.Dropout(rate=args.word_masking)(masked)
-        mapped_words = tf.cast(mapped_words, dtype=tf.dtypes.float32)
+        masked = tf.cast(masked, dtype=tf.dtypes.int64)
         dropped = tf.math.multiply(mapped_words, masked)
+        dropped = tf.cast(dropped, dtype=tf.dtypes.int64)
 
         # TODO(tagger_we): Embed input words with dimensionality `args.we_dim`. Note that the `word_mapping`
         # provides a `vocab_size()` call returning the number of unique words in the mapping.
