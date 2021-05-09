@@ -25,11 +25,11 @@ from morpho_dataset import MorphoDataset
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=10, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=12, type=int, help="Number of epochs.")
-parser.add_argument("--cle_dim", default=32, type=int, help="CLE embedding dimension.")
-parser.add_argument("--we_dim", default=32, type=int, help="Word embedding dimension.")
+parser.add_argument("--epochs", default=10, type=int, help="Number of epochs.")
+parser.add_argument("--cle_dim", default=128, type=int, help="CLE embedding dimension.")
+parser.add_argument("--we_dim", default=256, type=int, help="Word embedding dimension.")
 parser.add_argument("--rnn_cell", default="GRU", type=str, help="RNN cell type.")
-parser.add_argument("--rnn_cell_dim", default=32, type=int, help="RNN cell dimension.")
+parser.add_argument("--rnn_cell_dim", default=256, type=int, help="RNN cell dimension.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=4, type=int, help="Maximum number of threads to use.")
 parser.add_argument("--word_masking", default=0.15, type=float, help="Mask words with the given probability.")
@@ -50,10 +50,8 @@ class Network(tf.keras.Model):
         unique_words, indices_words = tf.unique(words.values)
         letters_seq = tf.strings.unicode_split(unique_words, input_encoding="UTF-8")
         mapped_letters_seq = train.forms.char_mapping(letters_seq)
-        embedded_chars = tf.keras.layers.Embedding(train.forms.char_mapping.vocab_size(), args.cle_dim)(
-            mapped_letters_seq)
-        bidirectional_cle = tf.keras.layers.Bidirectional(
-            tf.keras.layers.GRU(units=args.cle_dim, return_sequences=False), merge_mode='concat')(embedded_chars)
+        embedded_chars = tf.keras.layers.Embedding(train.forms.char_mapping.vocab_size(), args.cle_dim)(mapped_letters_seq)
+        bidirectional_cle = tf.keras.layers.Bidirectional(tf.keras.layers.GRU(units=args.cle_dim, return_sequences=False), merge_mode='concat')(embedded_chars)
         rep_words = tf.gather(bidirectional_cle, indices_words)
         rep_converted = words.with_values(rep_words)
         concat = tf.keras.layers.Concatenate()([embedded_words, rep_converted])
