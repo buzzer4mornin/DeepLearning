@@ -1,17 +1,10 @@
 #!/usr/bin/env python3
-
-# Team:
-# 3351ff04-3f62-11e9-b0fd-00505601122b
-# ff29975d-0276-11eb-9574-ea7484399335
-
-# Team members: Aydin Ahmadli, Filip Jurčák
-
 import argparse
 import datetime
 import os
 import re
-
 import warnings
+
 warnings.filterwarnings("ignore")
 
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # Report only TF errors by default
@@ -19,22 +12,23 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # Report only TF errors by d
 import numpy as np
 import tensorflow as tf
 
-from morpho_analyzer import MorphoAnalyzer
+# from morpho_analyzer import MorphoAnalyzer
 from morpho_dataset import MorphoDataset
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=10, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=10, type=int, help="Number of epochs.")
+parser.add_argument("--epochs", default=5, type=int, help="Number of epochs.")
 parser.add_argument("--cle_dim", default=128, type=int, help="CLE embedding dimension.")
 parser.add_argument("--we_dim", default=256, type=int, help="Word embedding dimension.")
-parser.add_argument("--rnn_cell", default="GRU", type=str, help="RNN cell type.")
+parser.add_argument("--rnn_cell", default="LSTM", type=str, help="RNN cell type.")
 parser.add_argument("--rnn_cell_dim", default=256, type=int, help="RNN cell dimension.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
-parser.add_argument("--threads", default=4, type=int, help="Maximum number of threads to use.")
-parser.add_argument("--word_masking", default=0.15, type=float, help="Mask words with the given probability.")
+parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+parser.add_argument("--word_masking", default=0.2, type=float, help="Mask words with the given probability.")
 parser.add_argument("--recodex", default=False, action="store_true", help="Evaluation in ReCodEx.")
 parser.add_argument("--verbose", default=False, action="store_true", help="Verbose TF logging.")
+
 
 class Network(tf.keras.Model):
     def __init__(self, args, train):
@@ -51,17 +45,17 @@ class Network(tf.keras.Model):
         letters_seq = tf.strings.unicode_split(unique_words, input_encoding="UTF-8")
         mapped_letters_seq = train.forms.char_mapping(letters_seq)
         embedded_chars = tf.keras.layers.Embedding(train.forms.char_mapping.vocab_size(), args.cle_dim)(mapped_letters_seq)
-        bidirectional_cle = tf.keras.layers.Bidirectional(tf.keras.layers.GRU(units=args.cle_dim, return_sequences=False), merge_mode='concat')(embedded_chars)
+        bidirectional_cle = tf.keras.layers.Bidirectional(tf.keras.layers.GRU(units=args.cle_dim, return_sequences=False), merge_mode='concat')(embedded_chars.to_tensor(), mask=tf.sequence_mask(embedded_chars.row_lengths()))
         rep_words = tf.gather(bidirectional_cle, indices_words)
         rep_converted = words.with_values(rep_words)
         concat = tf.keras.layers.Concatenate()([embedded_words, rep_converted])
 
         if args.rnn_cell == "LSTM":
-            bidirectional = tf.keras.layers.Bidirectional(
-                tf.keras.layers.LSTM(args.rnn_cell_dim, return_sequences=True), merge_mode='sum')(concat)
+            bidirectional_0 = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(args.rnn_cell_dim, return_sequences=True), merge_mode='sum')(concat.to_tensor(),mask=tf.sequence_mask(concat.row_lengths()))
+            bidirectional = tf.RaggedTensor.from_tensor(bidirectional_0, concat.row_lengths())
         elif args.rnn_cell == "GRU":
-            bidirectional = tf.keras.layers.Bidirectional(
-                tf.keras.layers.GRU(args.rnn_cell_dim, return_sequences=True), merge_mode='sum')(concat)
+            bidirectional_0 = tf.keras.layers.Bidirectional(tf.keras.layers.GRU(args.rnn_cell_dim, return_sequences=True), merge_mode='sum')(concat.to_tensor(),mask=tf.sequence_mask(concat.row_lengths()))
+            bidirectional = tf.RaggedTensor.from_tensor(bidirectional_0, concat.row_lengths())
 
         predictions = tf.keras.layers.TimeDistributed(
             tf.keras.layers.Dense(train.tags.word_mapping.vocab_size(), activation="softmax"))(bidirectional)
@@ -71,9 +65,10 @@ class Network(tf.keras.Model):
                      loss=tf.losses.SparseCategoricalCrossentropy(),
                      metrics=[tf.metrics.SparseCategoricalAccuracy(name="accuracy")])
 
-        self.tb_callback = tf.keras.callbacks.TensorBoard(args.logdir, update_freq=100, profile_batch=0)
-        self.tb_callback._close_writers = lambda: None  # A hack allowing to keep the writers open.
-
+    # Note that in TF 2.4, computing losses and metrics on RaggedTensors is not yet
+    # supported (it will be in TF 2.5). Therefore, we override the `train_step` method
+    # to support it, passing the "flattened" predictions and gold data to the loss
+    # and metrics.
     def train_step(self, data):
         x, y = data
         with tf.GradientTape() as tape:
@@ -99,13 +94,6 @@ def main(args):
     tf.config.threading.set_inter_op_parallelism_threads(args.threads)
     tf.config.threading.set_intra_op_parallelism_threads(args.threads)
 
-    # Create logdir name
-    args.logdir = os.path.join("logs", "{}-{}-{}".format(
-        os.path.basename(globals().get("__file__", "notebook")),
-        datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"),
-        ",".join(("{}={}".format(re.sub("(.)[^_]*_?", r"\1", key), value) for key, value in sorted(vars(args).items())))
-    ))
-
     # Load the data. Using analyses is only optional.
     morpho = MorphoDataset("czech_pdt")
 
@@ -123,11 +111,10 @@ def main(args):
     dev = morpho.dev.dataset.map(tagging_dataset).apply(tf.data.experimental.dense_to_ragged_batch(args.batch_size))
     test = morpho.test.dataset.map(tagging_dataset).apply(tf.data.experimental.dense_to_ragged_batch(args.batch_size))
 
-    model.fit(train, epochs=args.epochs, validation_data=dev, callbacks=[model.tb_callback])
+    model.fit(train, epochs=args.epochs, validation_data=dev)
 
     # Generate test set annotations, but in args.logdir to allow parallel execution.
-    os.makedirs(args.logdir, exist_ok=True)
-    with open(os.path.join(args.logdir, "tagger_competition.txt"), "w", encoding="utf-8") as predictions_file:
+    with open("tagger_competition.txt", "w", encoding="utf-8") as predictions_file:
         predictions = model.predict(test)
         tag_strings = morpho.test.tags.word_mapping.get_vocabulary()
         for sentence in predictions:
