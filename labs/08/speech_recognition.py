@@ -3,7 +3,8 @@ import argparse
 import datetime
 import os
 import re
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by default
+
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")  # Report only TF errors by default
 
 import numpy as np
 import tensorflow as tf
@@ -15,16 +16,16 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=10, type=int, help="Batch size.")
 parser.add_argument("--epochs", default=5, type=int, help="Number of epochs.")
 parser.add_argument("--ctc_beam", default=10, type=int, help="size")
-parser.add_argument("--rnn_cell_dim", default=512, type=int, help="RNN cell dimension.")
+parser.add_argument("--rnn_cell_dim", default=256, type=int, help="RNN cell dimension.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+
 
 class Network(tf.keras.Model):
     def __init__(self, args):
         self._ctc_beam = args.ctc_beam
 
         inputs = tf.keras.layers.Input(shape=[None, CommonVoiceCs.MFCC_DIM], dtype=tf.float32, ragged=True)
-
         # TODO: Create a suitable model. You should:
         # - use a bidirectional RNN layer(s) to contextualize the input sequences.
         #
@@ -40,63 +41,54 @@ class Network(tf.keras.Model):
         #   outputs (the plus one is for the CTC blank symbol). Note that no
         #   activation should be used (the CTC operations will take care of it).
         #   Do not forget to use `tf.keras.layers.TimeDistributed`.
+        # print(inputs.to_tensor())
 
-        bidirectional = tf.keras.layers.Bidirectional(tf.keras.layers.GRU(units=args.rnn_cell_dim, return_sequences=True), merge_mode='sum')(inputs.to_tensor(),mask=tf.sequence_mask(inputs.row_lengths()))
-        bidirectional = tf.RaggedTensor.from_tensor(bidirectional, inputs.row_lengths())
-        dropout = tf.keras.layers.Dropout(rate=0.4)(bidirectional)
-        outputs = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(len(CommonVoiceCs.LETTERS) + 1, activation=None))(dropout)
-
-        exit()
-        logits = ...
+        bidirectional_0 = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(args.rnn_cell_dim, return_sequences=True),merge_mode='sum')(inputs.to_tensor(),mask=tf.sequence_mask(inputs.row_lengths()))
+        bidirectional = tf.RaggedTensor.from_tensor(bidirectional_0, inputs.row_lengths())
+        # dropout = tf.keras.layers.Dropout(rate=0.4)(bidirectional)
+        logits = tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(len(CommonVoiceCs.LETTERS) + 1, activation=None))(bidirectional)
 
         super().__init__(inputs=inputs, outputs=logits)
 
         # We compile the model without loss, because `train_step` will directly call
         # the `selt.ctc_loss` method.
-        self.compile(optimizer=...,
-                     metrics=[CommonVoiceCs.EditDistanceMetric()])
+        lr_decay = tf.keras.optimizers.schedules.PolynomialDecay(initial_learning_rate=0.001, end_learning_rate=0.0001, decay_steps=9773 / args.batch_size * args.epochs)  # 9773 is train size
 
-        self.tb_callback = tf.keras.callbacks.TensorBoard(args.logdir, update_freq=100, profile_batch=0)
-        self.tb_callback._close_writers = lambda: None # A hack allowing to keep the writers open.
+        self.compile(optimizer=tf.optimizers.Adam(lr_decay),
+                     metrics=[CommonVoiceCs.EditDistanceMetric()])
+        # self.tb_callback = tf.keras.callbacks.TensorBoard(args.logdir, update_freq=100, profile_batch=0)
+        # self.tb_callback._close_writers = lambda: None  # A hack allowing to keep the writers open.
 
     def ctc_loss(self, gold_labels, logits):
         assert isinstance(gold_labels, tf.RaggedTensor), "Gold labels given to CTC loss must be RaggedTensors"
         assert isinstance(logits, tf.RaggedTensor), "Logits given to CTC loss must be RaggedTensors"
 
-        # TODO: Use tf.nn.ctc_loss to compute the CTC loss.
-        # - Convert the gold_labels to SparseTensor and pass `None` as `label_length`.
-        # - Convert `logits` to a dense Tensor and then either transpose the
-        #   logits to `[max_audio_length, batch, dim]` or set `logits_time_major=False`
-        # - Use `logits.row_lengths()` method to obtain the `logit_length`
-        # - Use the last class (the one with the highest index) as the `blank_index`.
-        #
-        # The `tc.nn.ctc_loss` returns a value for a single batch example, so average
-        # them to produce a single value and return it.
-        raise NotImplementedError()
+        gold_labels.to_tensor()
+        gold_labels = gold_labels.to_sparse()
+        l = logits.row_lengths()
+        logits = logits.to_tensor()
+        logits = tf.transpose(logits, [1, 0, 2])
+        loss = tf.nn.ctc_loss(tf.cast(gold_labels, dtype=tf.int32), logits, label_length=None, logit_length=tf.cast(l, dtype=tf.int32), blank_index=len(CommonVoiceCs.LETTERS))
+        return tf.reduce_mean(loss)
 
     def ctc_decode(self, logits):
         assert isinstance(logits, tf.RaggedTensor), "Logits given to CTC predict must be RaggedTensors"
 
-        # TODO: Run `tf.nn.ctc_greedy_decoder` or `tf.nn.ctc_beam_search_decoder`
-        # to perform prediction.
-        # - Convert the `logits` to a dense Tensor and then transpose them
-        #   to shape `[max_audio_length, batch, dim]` using `tf.transpose`
-        # - Use `logits.row_lengths()` method to obtain the `sequence_length`
-        # - Convert the result of the decoded from a SparseTensor to a RaggedTensor
-        predictions = ...
+        l = logits.row_lengths()
+        logits = logits.to_tensor()
+        logits = tf.transpose(logits, [1, 0, 2])
 
+        (predictions,), _ = tf.nn.ctc_beam_search_decoder(logits, l, beam_width=self.ctc_beam)
+        predictions = tf.RaggedTensor.from_sparse(predictions)
         assert isinstance(predictions, tf.RaggedTensor), "CTC predictions must be RaggedTensors"
         return predictions
 
-    # We override the `train_step` method, because:
-    # - computing losses on RaggedTensors is not supported in TF 2.4
-    # - we do not want to evaluate the training data, because CTC decoding is slow
     def train_step(self, data):
         x, y = data
         with tf.GradientTape() as tape:
             y_pred = self(x, training=True)
             loss = self.ctc_loss(y, y_pred)
-            if self.losses: # Add regularization losses if present
+            if self.losses:  # Add regularization losses if present
                 loss += tf.math.add_n(self.losses)
         self.optimizer.minimize(loss, self.trainable_variables, tape=tape)
         return {"loss": loss}
@@ -114,6 +106,7 @@ class Network(tf.keras.Model):
         y_pred = self.predict_step(data)
         self.compiled_metrics.update_state(y, y_pred)
         return {m.name: m.result() for m in self.metrics}
+
 
 def main(args):
     # Fix random seeds and threads
@@ -144,7 +137,7 @@ def main(args):
             inputs, outputs = example["mfccs"], example["sentence"]
             outputs = tf.strings.unicode_split(outputs, 'UTF-8')
             outputs = cvcs.letters_mapping(outputs)
-
+            outputs = tf.cast(outputs, dtype=tf.int32)
             return inputs, outputs
 
         dataset = getattr(cvcs, name).map(prepare_example)
@@ -153,20 +146,20 @@ def main(args):
         dataset = dataset.prefetch(tf.data.AUTOTUNE)
         return dataset
 
-    train, dev, test = create_dataset("train").batch(args.batch_size), create_dataset("dev").batch(args.batch_size), create_dataset("test").batch(args.batch_size)
+    train, dev, test = create_dataset("train"), create_dataset("dev"), create_dataset("test")
 
     # TODO: Create the model and train it
     model = Network(args)
     model.fit(train, epochs=args.epochs, validation_data=dev)
 
-    # Generate test set annotations, but in args.logdir to allow parallel execution.
+    #Generate test set annotations, but in args.logdir to allow parallel execution.
     os.makedirs(args.logdir, exist_ok=True)
     with open(os.path.join(args.logdir, "speech_recognition.txt"), "w", encoding="utf-8") as predictions_file:
         # TODO: Predict the CommonVoice sentences.
-        predictions = ...
-
+        predictions = model.predict(test)
         for sentence in predictions:
             print("".join(CommonVoiceCs.LETTERS[char] for char in sentence), file=predictions_file)
+
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
