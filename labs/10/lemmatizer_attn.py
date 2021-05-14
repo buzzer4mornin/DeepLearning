@@ -23,7 +23,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=10, type=int, help="Batch size.")
 parser.add_argument("--cle_dim", default=64, type=int, help="CLE embedding dimension.")
 parser.add_argument("--epochs", default=10, type=int, help="Number of epochs.")
-parser.add_argument("--max_sentences", default=None, type=int, help="Maximum number of sentences to load.")
+parser.add_argument("--max_sentences", default=200, type=int, help="Maximum number of sentences to load.")
 parser.add_argument("--recodex", default=False, action="store_true", help="Evaluation in ReCodEx.")
 parser.add_argument("--rnn_dim", default=64, type=int, help="RNN cell dimension.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
@@ -42,6 +42,7 @@ class Network(tf.keras.Model):
         # TODO(lemmatizer_noattn): Define
         # - `self.source_embedding` as an embedding layer of source chars into `args.cle_dim` dimensions
         self.source_embedding = tf.keras.layers.Embedding(input_dim=self.source_mapping.vocab_size(), output_dim=args.cle_dim)
+
         # TODO: Define
         # - `self.source_rnn` as a bidirectional GRU with `args.rnn_dim` units, returning **whole sequences**,
         #   summing opposite directions
@@ -114,8 +115,9 @@ class Network(tf.keras.Model):
             sum = source_states + tf.expand_dims(states, axis=1)
             sum = tf.tanh(sum)
             sum = self.lemmatizer.attention_weight_layer(sum)
-            weights = tf.nn.softmax(sum, axis=2)
-            attention = tf.reduce_sum(self.source_states * weights, axis=1)  # FLC que eixo?
+            weights = tf.nn.softmax(sum, axis=1)
+            attention = tf.math.multiply(self.source_states, weights)
+            attention = tf.reduce_sum(attention, axis=1)
             return tf.concat([inputs, attention], axis=1)
 
         def initialize(self, layer_inputs, initial_state=None, mask=None):
