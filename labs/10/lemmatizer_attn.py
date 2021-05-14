@@ -1,4 +1,11 @@
 #!/usr/bin/env python3
+
+# Team:
+# 3351ff04-3f62-11e9-b0fd-00505601122b
+# ff29975d-0276-11eb-9574-ea7484399335
+
+# Team members: Aydin Ahmadli, Filip Jurčák
+
 import argparse
 import datetime
 import os
